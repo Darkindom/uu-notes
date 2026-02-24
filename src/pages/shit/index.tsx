@@ -1,7 +1,7 @@
 import { View, Text, Picker, Button } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
-import { addRecord } from '../../utils/db'
+import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db'
 import {
   getCurrentDateTime,
   dateTimeToTimestamp,
@@ -9,6 +9,7 @@ import {
   AMOUNT_VALUES,
   SHIT_COLORS,
   SHIT_HARDNESS,
+  formatRecordSummary,
 } from '../../utils/format'
 import './index.less'
 
@@ -20,8 +21,31 @@ export default function ShitPage() {
   const [amountIdx, setAmountIdx] = useState<number | null>(null)
   const [color, setColor] = useState<string | null>(null)
   const [hardness, setHardness] = useState<string | null>(null)
+  const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
 
-  useLoad(() => {})
+  useLoad(() => {
+    setRecentRecords(getRecentByCategory('shit'))
+  })
+
+  function applyPrefill(r: DbRecord) {
+    const sub = r.subcategory as 'big' | 'small'
+    setShitType(sub)
+    const idx = AMOUNT_VALUES.indexOf(r.value)
+    setAmountIdx(idx >= 0 ? idx : null)
+    if (sub === 'big') {
+      try {
+        const extra = JSON.parse(r.extra || '{}')
+        setColor(extra.color ?? null)
+        setHardness(extra.hardness ?? null)
+      } catch {
+        setColor(null)
+        setHardness(null)
+      }
+    } else {
+      setColor(null)
+      setHardness(null)
+    }
+  }
 
   function handleSubmit() {
     const extra: Record<string, string> = {}
@@ -58,41 +82,52 @@ export default function ShitPage() {
           </View>
         </View>
 
-        {/* Type + Amount side by side */}
-        <View className='section two-col-section'>
-          <View className='col'>
-            <Text className='field-label'>类型</Text>
-            <View className='col-chips'>
-              <View
-                className={`option-chip ${shitType === 'big' ? 'active' : ''}`}
-                onClick={() => { setShitType('big'); setAmountIdx(null); setColor(null); setHardness(null) }}
-              >
-                <Text>💩 大便</Text>
-              </View>
-              <View
-                className={`option-chip ${shitType === 'small' ? 'active' : ''}`}
-                onClick={() => { setShitType('small'); setAmountIdx(null); setColor(null); setHardness(null) }}
-              >
-                <Text>💧 小便</Text>
-              </View>
-            </View>
-          </View>
-
-          <View className='divider-v' />
-
-          <View className='col'>
-            <Text className='field-label'>量</Text>
-            <View className='col-chips'>
-              {AMOUNT_LABELS.map((label, idx) => (
-                <View
-                  key={label}
-                  className={`option-chip ${amountIdx === idx ? 'active' : ''}`}
-                  onClick={() => setAmountIdx(amountIdx === idx ? null : idx)}
-                >
-                  <Text>{label}</Text>
+        {/* Prefill */}
+        {recentRecords.length > 0 && (
+          <View className='section section-vertical'>
+            <Text className='field-label'>📋 历史预填</Text>
+            <View className='prefill-row'>
+              {recentRecords.map(r => (
+                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                  <Text>{formatRecordSummary(r)}</Text>
                 </View>
               ))}
             </View>
+          </View>
+        )}
+
+        {/* Type */}
+        <View className='section'>
+          <Text className='field-label'>🚽 类型</Text>
+          <View className='options-row'>
+            <View
+              className={`option-chip ${shitType === 'big' ? 'active' : ''}`}
+              onClick={() => { setShitType('big'); setAmountIdx(null); setColor(null); setHardness(null) }}
+            >
+              <Text>大便</Text>
+            </View>
+            <View
+              className={`option-chip ${shitType === 'small' ? 'active' : ''}`}
+              onClick={() => { setShitType('small'); setAmountIdx(null); setColor(null); setHardness(null) }}
+            >
+              <Text>小便</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Amount */}
+        <View className='section'>
+          <Text className='field-label'>📊 分量</Text>
+          <View className='options-row'>
+            {AMOUNT_LABELS.map((label, idx) => (
+              <View
+                key={label}
+                className={`option-chip ${amountIdx === idx ? 'active' : ''}`}
+                onClick={() => setAmountIdx(amountIdx === idx ? null : idx)}
+              >
+                <Text>{label}</Text>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -104,9 +139,7 @@ export default function ShitPage() {
               {SHIT_COLORS.map((c) => (
                 <View
                   key={c.value}
-                  className={`option-chip color-chip color-${c.value} ${
-                    color === c.value ? 'active' : ''
-                  }`}
+                  className={`option-chip ${color === c.value ? 'active' : ''}`}
                   onClick={() => setColor(color === c.value ? null : c.value)}
                 >
                   <Text>{c.label}</Text>

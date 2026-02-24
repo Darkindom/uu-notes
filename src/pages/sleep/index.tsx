@@ -1,8 +1,8 @@
 import { View, Text, Input, Picker, Button } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
-import { addRecord } from '../../utils/db'
-import { getCurrentDateTime, dateTimeToTimestamp } from '../../utils/format'
+import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db'
+import { getCurrentDateTime, dateTimeToTimestamp, formatRecordSummary } from '../../utils/format'
 import './index.less'
 
 export default function SleepPage() {
@@ -11,8 +11,17 @@ export default function SleepPage() {
   const [time, setTime] = useState(dt.time)
   const [hours, setHours] = useState('')
   const [minutes, setMinutes] = useState('')
+  const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
 
-  useLoad(() => {})
+  useLoad(() => {
+    setRecentRecords(getRecentByCategory('sleep'))
+  })
+
+  function applyPrefill(r: DbRecord) {
+    const totalMin = parseInt(r.value) || 0
+    setHours(String(Math.floor(totalMin / 60)))
+    setMinutes(String(totalMin % 60))
+  }
 
   function handleSubmit() {
     const h = parseInt(hours) || 0
@@ -57,6 +66,20 @@ export default function SleepPage() {
             </Picker>
           </View>
         </View>
+
+        {/* Prefill */}
+        {recentRecords.length > 0 && (
+          <View className='section section-vertical'>
+            <Text className='field-label'>📋 历史预填</Text>
+            <View className='prefill-row'>
+              {recentRecords.map(r => (
+                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                  <Text>{formatRecordSummary(r)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Duration */}
         <View className='section'>

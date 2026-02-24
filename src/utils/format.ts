@@ -4,10 +4,10 @@ export const AMOUNT_LABELS = ['较少', '适中', '很多']
 export const AMOUNT_VALUES = ['0', '1', '2']
 
 export const SHIT_COLORS = [
-  { label: '黄色', value: 'yellow' },
-  { label: '绿色', value: 'green' },
-  { label: '棕色', value: 'brown' },
-  { label: '黑色', value: 'black' },
+  { label: '黄', value: 'yellow' },
+  { label: '绿', value: 'green' },
+  { label: '棕', value: 'brown' },
+  { label: '黑', value: 'black' },
   { label: '其他', value: 'other' },
 ]
 

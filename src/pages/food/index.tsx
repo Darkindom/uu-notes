@@ -1,12 +1,13 @@
 import { View, Text, Input, Picker, Button } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
-import { addRecord } from '../../utils/db'
+import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db'
 import {
   getCurrentDateTime,
   dateTimeToTimestamp,
   AMOUNT_LABELS,
   AMOUNT_VALUES,
+  formatRecordSummary,
 } from '../../utils/format'
 import './index.less'
 
@@ -27,8 +28,35 @@ export default function FoodPage() {
   const [milkAmount, setMilkAmount] = useState('')
   const [amountIdx, setAmountIdx] = useState<number | null>(null)
   const [foodName, setFoodName] = useState('')
+  const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
 
-  useLoad(() => {})
+  useLoad(() => {
+    setRecentRecords(getRecentByCategory('food'))
+  })
+
+  function applyPrefill(r: DbRecord) {
+    const sub = r.subcategory as FoodType
+    setFoodType(sub)
+    if (sub === 'breast_milk' || sub === 'milk') {
+      setMilkAmount(r.value)
+      setAmountIdx(null)
+      setFoodName('')
+    } else {
+      setMilkAmount('')
+      const idx = AMOUNT_VALUES.indexOf(r.value)
+      setAmountIdx(idx >= 0 ? idx : null)
+      if (sub === 'babycook') {
+        try {
+          const extra = JSON.parse(r.extra || '{}')
+          setFoodName(extra.food_type ?? '')
+        } catch {
+          setFoodName('')
+        }
+      } else {
+        setFoodName('')
+      }
+    }
+  }
 
   const isMilk = foodType === 'breast_milk' || foodType === 'milk'
 
@@ -77,6 +105,20 @@ export default function FoodPage() {
             </Picker>
           </View>
         </View>
+
+        {/* Prefill */}
+        {recentRecords.length > 0 && (
+          <View className='section section-vertical'>
+            <Text className='field-label'>📋 历史预填</Text>
+            <View className='prefill-row'>
+              {recentRecords.map(r => (
+                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                  <Text>{formatRecordSummary(r)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Food type */}
         <View className='section'>

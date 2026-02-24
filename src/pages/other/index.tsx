@@ -1,8 +1,8 @@
 import { View, Text, Input, Picker, Button } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
-import { addRecord } from '../../utils/db'
-import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES } from '../../utils/format'
+import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db'
+import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES, formatRecordSummary } from '../../utils/format'
 import './index.less'
 
 type SubType = 'tonic' | 'outdoor' | 'cry'
@@ -20,8 +20,28 @@ export default function OtherPage() {
   const [subType, setSubType] = useState<SubType>('outdoor')
   const [tonicType, setTonicType] = useState(TONIC_TYPES[0])
   const [duration, setDuration] = useState('')
+  const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
 
-  useLoad(() => {})
+  useLoad(() => {
+    setRecentRecords(getRecentByCategory('other'))
+  })
+
+  function applyPrefill(r: DbRecord) {
+    const sub = r.subcategory as SubType
+    setSubType(sub)
+    if (sub === 'tonic') {
+      try {
+        const extra = JSON.parse(r.extra || '{}')
+        setTonicType(extra.tonic_type ?? TONIC_TYPES[0])
+      } catch {
+        setTonicType(TONIC_TYPES[0])
+      }
+      setDuration('')
+    } else {
+      setDuration(r.value)
+      setTonicType(TONIC_TYPES[0])
+    }
+  }
 
   function handleSubmit() {
     let value = ''
@@ -82,6 +102,20 @@ export default function OtherPage() {
             </Picker>
           </View>
         </View>
+
+        {/* Prefill */}
+        {recentRecords.length > 0 && (
+          <View className='section section-vertical'>
+            <Text className='field-label'>📋 历史预填</Text>
+            <View className='prefill-row'>
+              {recentRecords.map(r => (
+                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                  <Text>{formatRecordSummary(r)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Tonic */}
         {subType === 'tonic' && (

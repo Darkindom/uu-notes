@@ -46,3 +46,9 @@ export function deleteRecord(id: string): void {
 export function getRecentRecords(limit = 50): Record[] {
   return getAllRecords().slice(0, limit)
 }
+
+export function getRecentByCategory(category: Category, limit = 5): Record[] {
+  return getAllRecords()
+    .filter(r => r.category === category)
+    .slice(0, limit)
+}
