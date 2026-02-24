@@ -1,0 +1,43 @@
+.shit-page {
+  .option-chip.active {
+    background: #8b6e5b;
+    border-color: #8b6e5b;
+  }
+
+  .submit-btn {
+    background: #8b6e5b;
+  }
+
+  .two-col-section {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .col {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .col-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .divider-v {
+    width: 2px;
+    background: #f2ece5;
+    align-self: stretch;
+    margin: 0 20px;
+    flex-shrink: 0;
+  }
+
+  .color-chip {
+    &.color-yellow.active { background: #f5c842; border-color: #f5c842; color: #333; }
+    &.color-green.active  { background: #6aab5b; border-color: #6aab5b; color: #fff; }
+    &.color-brown.active  { background: #8b5e3c; border-color: #8b5e3c; color: #fff; }
+    &.color-black.active  { background: #333;    border-color: #333;    color: #fff; }
+    &.color-other.active  { background: #8b6e5b; border-color: #8b6e5b; color: #fff; }
+  }
+}

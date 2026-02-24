@@ -1,6 +1,6 @@
 export default definePageConfig({
-  navigationBarTitleText: '猪宝日常',
-  navigationBarBackgroundColor: '#FF6B35',
+  navigationBarTitleText: '拉',
+  navigationBarBackgroundColor: '#8B6E5B',
   navigationBarTextStyle: 'white',
   backgroundColor: '#FFF8F0',
 })

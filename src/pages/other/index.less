@@ -1,0 +1,63 @@
+.other-page {
+  .option-chip.active {
+    background: #4caf7d;
+    border-color: #4caf7d;
+  }
+
+  .submit-btn {
+    background: #4caf7d;
+  }
+
+  .sub-menu-row {
+    display: flex;
+    gap: 16px;
+  }
+
+  .sub-btn {
+    flex: 1;
+    border-radius: 22px;
+    border: 3px solid #c8ecd8;
+    background: #f0faf5;
+    padding: 28px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+
+    &.active {
+      background: #4caf7d;
+      border-color: #4caf7d;
+
+      .sub-label {
+        color: #fff;
+      }
+    }
+
+    &:active {
+      opacity: 0.8;
+    }
+  }
+
+  .sub-emoji {
+    font-size: 64px;
+  }
+
+  .sub-label {
+    font-size: 42px;
+    font-weight: 800;
+    color: #4caf7d;
+  }
+
+  .duration-input {
+    flex: 1;
+    height: 104px;
+    border: 3px solid #e0d5ca;
+    border-radius: 20px;
+    padding: 0 24px;
+    font-size: 56px;
+    font-weight: 700;
+    color: #1a1a2e;
+    background: #fff;
+    box-sizing: border-box;
+  }
+}
