@@ -70,8 +70,8 @@ export default function ShitPage() {
     <View className='page-container shit-page'>
       <View className='main-card'>
         {/* Time */}
-        <View className='section'>
-          <Text className='field-label'>🕐 时间</Text>
+        <View className='section section-inline'>
+          <Text className='field-label'>时间</Text>
           <View className='time-row'>
             <Picker mode='date' value={date} onChange={(e) => setDate(e.detail.value)}>
               <View className='picker-display'>{date}</View>
@@ -85,7 +85,7 @@ export default function ShitPage() {
         {/* Prefill */}
         {recentRecords.length > 0 && (
           <View className='section section-vertical'>
-            <Text className='field-label'>📋 历史预填</Text>
+            <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
                 <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
@@ -97,8 +97,8 @@ export default function ShitPage() {
         )}
 
         {/* Type */}
-        <View className='section'>
-          <Text className='field-label'>🚽 类型</Text>
+        <View className='section section-inline'>
+          <Text className='field-label'>类型</Text>
           <View className='options-row'>
             <View
               className={`option-chip ${shitType === 'big' ? 'active' : ''}`}
@@ -116,8 +116,8 @@ export default function ShitPage() {
         </View>
 
         {/* Amount */}
-        <View className='section'>
-          <Text className='field-label'>📊 分量</Text>
+        <View className='section section-inline'>
+          <Text className='field-label'>数量</Text>
           <View className='options-row'>
             {AMOUNT_LABELS.map((label, idx) => (
               <View
@@ -133,8 +133,8 @@ export default function ShitPage() {
 
         {/* Color — only for big */}
         {shitType === 'big' && (
-          <View className='section'>
-            <Text className='field-label'>🎨 颜色</Text>
+          <View className='section section-inline'>
+            <Text className='field-label'>颜色</Text>
             <View className='options-row'>
               {SHIT_COLORS.map((c) => (
                 <View
@@ -151,8 +151,8 @@ export default function ShitPage() {
 
         {/* Hardness — only for big */}
         {shitType === 'big' && (
-          <View className='section'>
-            <Text className='field-label'>🧪 软硬</Text>
+          <View className='section section-inline'>
+            <Text className='field-label'>软硬</Text>
             <View className='options-row'>
               {SHIT_HARDNESS.map((h) => (
                 <View
@@ -169,7 +169,7 @@ export default function ShitPage() {
       </View>
 
       <Button className='submit-btn' onClick={handleSubmit}>
-        ✓ 记录
+        记录
       </Button>
     </View>
   )

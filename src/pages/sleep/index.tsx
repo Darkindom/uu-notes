@@ -55,8 +55,8 @@ export default function SleepPage() {
       <View className='main-card'>
 
         {/* Time */}
-        <View className='section'>
-          <Text className='field-label'>🕐 入睡时间</Text>
+        <View className='section section-inline'>
+          <Text className='field-label'>入睡时间</Text>
           <View className='time-row'>
             <Picker mode='date' value={date} onChange={e => setDate(e.detail.value)}>
               <View className='picker-display'>{date}</View>
@@ -70,7 +70,7 @@ export default function SleepPage() {
         {/* Prefill */}
         {recentRecords.length > 0 && (
           <View className='section section-vertical'>
-            <Text className='field-label'>📋 历史预填</Text>
+            <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
                 <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
@@ -83,7 +83,7 @@ export default function SleepPage() {
 
         {/* Duration */}
         <View className='section'>
-          <Text className='field-label'>⏱️ 睡眠时长</Text>
+          <Text className='field-label'>睡眠时长</Text>
           <View className='duration-row'>
             <View className='duration-group'>
               <Input
@@ -110,7 +110,7 @@ export default function SleepPage() {
 
         {/* Quick select */}
         <View className='section'>
-          <Text className='field-label'>⚡ 快速选择</Text>
+          <Text className='field-label'>快速选择</Text>
           <View className='options-row'>
             {[30, 60, 90, 120].map(min => (
               <View
@@ -127,7 +127,7 @@ export default function SleepPage() {
       </View>
 
       <Button className='submit-btn' onClick={handleSubmit}>
-        ✓ 记录
+        记录
       </Button>
     </View>
   )

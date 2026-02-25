@@ -7,10 +7,10 @@ import './index.less'
 
 type SubType = 'tonic' | 'outdoor' | 'cry'
 
-const SUB_MENUS: { label: string; value: SubType; emoji: string }[] = [
-  { label: '户外', value: 'outdoor', emoji: '🌳' },
-  { label: '补剂', value: 'tonic', emoji: '💊' },
-  { label: '哭闹', value: 'cry', emoji: '😭' },
+const SUB_MENUS: { label: string; value: SubType }[] = [
+  { label: '户外', value: 'outdoor' },
+  { label: '补剂', value: 'tonic' },
+  { label: '哭闹', value: 'cry' },
 ]
 
 export default function OtherPage() {
@@ -83,7 +83,6 @@ export default function OtherPage() {
                 className={`sub-btn ${subType === item.value ? 'active' : ''}`}
                 onClick={() => setSubType(item.value)}
               >
-                <Text className='sub-emoji'>{item.emoji}</Text>
                 <Text className='sub-label'>{item.label}</Text>
               </View>
             ))}
@@ -91,8 +90,8 @@ export default function OtherPage() {
         </View>
 
         {/* Time */}
-        <View className='section'>
-          <Text className='field-label'>🕐 时间</Text>
+        <View className='section section-inline'>
+          <Text className='field-label'>时间</Text>
           <View className='time-row'>
             <Picker mode='date' value={date} onChange={(e) => setDate(e.detail.value)}>
               <View className='picker-display'>{date}</View>
@@ -106,7 +105,7 @@ export default function OtherPage() {
         {/* Prefill */}
         {recentRecords.length > 0 && (
           <View className='section section-vertical'>
-            <Text className='field-label'>📋 历史预填</Text>
+            <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
                 <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
@@ -120,7 +119,7 @@ export default function OtherPage() {
         {/* Tonic */}
         {subType === 'tonic' && (
           <View className='section'>
-            <Text className='field-label'>💊 补剂种类</Text>
+            <Text className='field-label'>补剂种类</Text>
             <View className='options-row'>
               {TONIC_TYPES.map((t) => (
                 <View
@@ -138,12 +137,12 @@ export default function OtherPage() {
         {/* Duration */}
         {(subType === 'outdoor' || subType === 'cry') && (
           <View className='section'>
-            <Text className='field-label'>{subType === 'outdoor' ? '🌿 时长' : '😭 时长'}</Text>
+            <Text className='field-label'>{subType === 'outdoor' ? '时长' : '时长'}</Text>
             <View className='number-input-row'>
               <Input
                 className='duration-input'
                 type='number'
-                placeholder='请输入分钟数'
+                placeholder='分钟数'
                 value={duration}
                 onInput={(e) => setDuration(e.detail.value)}
               />
@@ -154,7 +153,7 @@ export default function OtherPage() {
       </View>
 
       <Button className='submit-btn' onClick={handleSubmit}>
-        ✓ 记录
+        记录
       </Button>
     </View>
   )

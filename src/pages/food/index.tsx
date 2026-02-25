@@ -94,8 +94,8 @@ export default function FoodPage() {
       <View className='main-card'>
 
         {/* Time */}
-        <View className='section'>
-          <Text className='field-label'>🕐 时间</Text>
+        <View className='section section-inline'>
+          <Text className='field-label'>时间</Text>
           <View className='time-row'>
             <Picker mode='date' value={date} onChange={e => setDate(e.detail.value)}>
               <View className='picker-display'>{date}</View>
@@ -109,7 +109,7 @@ export default function FoodPage() {
         {/* Prefill */}
         {recentRecords.length > 0 && (
           <View className='section section-vertical'>
-            <Text className='field-label'>📋 历史预填</Text>
+            <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
                 <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
@@ -122,7 +122,7 @@ export default function FoodPage() {
 
         {/* Food type */}
         <View className='section'>
-          <Text className='field-label'>🍼 类型</Text>
+          <Text className='field-label'>类型</Text>
           <View className='options-row'>
             {FOOD_TYPES.map(ft => (
               <View
@@ -138,13 +138,13 @@ export default function FoodPage() {
 
         {/* Amount */}
         <View className='section'>
-          <Text className='field-label'>{isMilk ? '💧 奶量' : '🥣 饭量'}</Text>
+          <Text className='field-label'>{isMilk ? '奶量' : '饭量'}</Text>
           {isMilk ? (
             <View className='number-input-row'>
               <Input
                 className='amount-input'
                 type='number'
-                placeholder='请输入奶量'
+                placeholder='输入奶量'
                 value={milkAmount}
                 onInput={e => setMilkAmount(e.detail.value)}
               />
@@ -168,10 +168,10 @@ export default function FoodPage() {
         {/* Food name — only for babycook */}
         {foodType === 'babycook' && (
           <View className='section'>
-            <Text className='field-label'>🥕 食物名称（选填）</Text>
+            <Text className='field-label'>食物名称</Text>
             <Input
               className='text-input'
-              placeholder='如：米粥、南瓜泥...'
+              placeholder='米粥、南瓜泥'
               value={foodName}
               onInput={e => setFoodName(e.detail.value)}
             />
@@ -181,7 +181,7 @@ export default function FoodPage() {
       </View>
 
       <Button className='submit-btn' onClick={handleSubmit}>
-        ✓ 记录
+        记录
       </Button>
     </View>
   )

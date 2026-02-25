@@ -1,13 +1,14 @@
 import type { Record } from './db'
 
-export const AMOUNT_LABELS = ['较少', '适中', '很多']
+export const AMOUNT_LABELS = ['少', '中', '多']
 export const AMOUNT_VALUES = ['0', '1', '2']
 
 export const SHIT_COLORS = [
   { label: '黄', value: 'yellow' },
-  { label: '绿', value: 'green' },
   { label: '棕', value: 'brown' },
   { label: '黑', value: 'black' },
+  { label: '绿', value: 'green' },
+  { label: '红', value: 'red' },
   { label: '其他', value: 'other' },
 ]
 
@@ -71,8 +72,8 @@ export function formatRecordSummary(record: Record): string {
     return `睡了 ${val}分钟`
   }
   if (sub === 'big') {
-    const color = SHIT_COLORS.find(c => c.value === extra.color)?.label ?? ''
-    const hardness = SHIT_HARDNESS.find(h => h.value === extra.hardness)?.label ?? ''
+    const color = SHIT_COLORS.find((c) => c.value === extra.color)?.label ?? ''
+    const hardness = SHIT_HARDNESS.find((h) => h.value === extra.hardness)?.label ?? ''
     return `大便 ${AMOUNT_LABELS[parseInt(val)] ?? val} ${color} ${hardness}`.trim()
   }
   if (sub === 'small') {
