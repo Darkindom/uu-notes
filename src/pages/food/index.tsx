@@ -30,8 +30,9 @@ export default function FoodPage() {
   const [foodName, setFoodName] = useState('')
   const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
 
-  useLoad(() => {
-    setRecentRecords(getRecentByCategory('food'))
+  useLoad(async () => {
+    const records = await getRecentByCategory('food')
+    setRecentRecords(records)
   })
 
   function applyPrefill(r: DbRecord) {
@@ -112,7 +113,7 @@ export default function FoodPage() {
             <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
-                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
                   <Text>{formatRecordSummary(r)}</Text>
                 </View>
               ))}

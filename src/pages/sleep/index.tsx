@@ -13,8 +13,9 @@ export default function SleepPage() {
   const [minutes, setMinutes] = useState('')
   const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
 
-  useLoad(() => {
-    setRecentRecords(getRecentByCategory('sleep'))
+  useLoad(async () => {
+    const records = await getRecentByCategory('sleep')
+    setRecentRecords(records)
   })
 
   function applyPrefill(r: DbRecord) {
@@ -53,15 +54,14 @@ export default function SleepPage() {
   return (
     <View className='page-container sleep-page'>
       <View className='main-card'>
-
         {/* Time */}
         <View className='section section-inline'>
-          <Text className='field-label'>入睡时间</Text>
+          <Text className='field-label'>时间</Text>
           <View className='time-row'>
-            <Picker mode='date' value={date} onChange={e => setDate(e.detail.value)}>
+            <Picker mode='date' value={date} onChange={(e) => setDate(e.detail.value)}>
               <View className='picker-display'>{date}</View>
             </Picker>
-            <Picker mode='time' value={time} onChange={e => setTime(e.detail.value)}>
+            <Picker mode='time' value={time} onChange={(e) => setTime(e.detail.value)}>
               <View className='picker-display'>{time}</View>
             </Picker>
           </View>
@@ -72,8 +72,8 @@ export default function SleepPage() {
           <View className='section section-vertical'>
             <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
-              {recentRecords.map(r => (
-                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+              {recentRecords.map((r) => (
+                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
                   <Text>{formatRecordSummary(r)}</Text>
                 </View>
               ))}
@@ -91,7 +91,7 @@ export default function SleepPage() {
                 type='number'
                 placeholder='0'
                 value={hours}
-                onInput={e => setHours(e.detail.value)}
+                onInput={(e) => setHours(e.detail.value)}
               />
               <Text className='unit-text'>小时</Text>
             </View>
@@ -101,7 +101,7 @@ export default function SleepPage() {
                 type='number'
                 placeholder='0'
                 value={minutes}
-                onInput={e => setMinutes(e.detail.value)}
+                onInput={(e) => setMinutes(e.detail.value)}
               />
               <Text className='unit-text'>分钟</Text>
             </View>
@@ -112,18 +112,13 @@ export default function SleepPage() {
         <View className='section'>
           <Text className='field-label'>快速选择</Text>
           <View className='options-row'>
-            {[30, 60, 90, 120].map(min => (
-              <View
-                key={min}
-                className='option-chip quick-chip'
-                onClick={() => quickSet(min)}
-              >
+            {[30, 60, 90, 120].map((min) => (
+              <View key={min} className='option-chip quick-chip' onClick={() => quickSet(min)}>
                 <Text>{min < 60 ? `${min}分` : `${min / 60}小时`}</Text>
               </View>
             ))}
           </View>
         </View>
-
       </View>
 
       <Button className='submit-btn' onClick={handleSubmit}>

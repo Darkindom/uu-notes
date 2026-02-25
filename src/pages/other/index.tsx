@@ -22,8 +22,9 @@ export default function OtherPage() {
   const [duration, setDuration] = useState('')
   const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
 
-  useLoad(() => {
-    setRecentRecords(getRecentByCategory('other'))
+  useLoad(async () => {
+    const records = await getRecentByCategory('other')
+    setRecentRecords(records)
   })
 
   function applyPrefill(r: DbRecord) {
@@ -108,7 +109,7 @@ export default function OtherPage() {
             <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
-                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
                   <Text>{formatRecordSummary(r)}</Text>
                 </View>
               ))}
