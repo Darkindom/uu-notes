@@ -2,6 +2,7 @@ import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { isFirstTime, getCurrentBaby } from '../../utils/db'
+import { getIndexCache, setIndexCache } from '../../utils/cache'
 import './index.less'
 
 const MENU_ITEMS = [
@@ -11,11 +12,29 @@ const MENU_ITEMS = [
   { label: '其他', emoji: '✨', path: '/pages/other/index', color: '#4CAF7D', bg: '#EDFBF3' },
 ]
 
+const CACHE_DURATION = 5 * 60 * 1000 // 5分钟缓存
+
 export default function Index() {
-  const [babyName, setBabyName] = useState('')
+  const [babyName, setBabyName] = useState(() => {
+    // 初始化时先从缓存读取
+    const cache = getIndexCache()
+    return cache?.name || ''
+  })
   const [loading, setLoading] = useState(true)
 
   useDidShow(async () => {
+    // 检查缓存是否有效
+    const cache = getIndexCache()
+    const now = Date.now()
+    
+    if (cache && (now - cache.timestamp < CACHE_DURATION)) {
+      // 缓存有效，直接使用
+      setBabyName(cache.name)
+      setLoading(false)
+      return
+    }
+
+    // 缓存无效或不存在，重新加载
     setLoading(true)
     try {
       // 检查是否首次使用（没有用户信息）
@@ -34,6 +53,9 @@ export default function Index() {
       }
 
       setBabyName(baby.name)
+      
+      // 更新缓存
+      setIndexCache(baby.name)
     } catch (error) {
       console.error('加载数据失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })

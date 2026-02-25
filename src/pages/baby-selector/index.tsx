@@ -2,6 +2,7 @@ import { View, Text, Button } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { getUserBabies, switchBaby, getCurrentUser, deleteBaby, type Baby } from '../../utils/db'
+import { clearIndexCache } from '../../utils/cache'
 import './index.less'
 
 export default function BabySelectorPage() {
@@ -35,6 +36,8 @@ export default function BabySelectorPage() {
 
     try {
       await switchBaby(babyId)
+      // 清除首页缓存，强制重新加载新宝宝信息
+      clearIndexCache()
       Taro.showToast({ title: '切换成功', icon: 'success' })
       // 刷新当前页面数据
       await loadBabies()
@@ -68,6 +71,8 @@ export default function BabySelectorPage() {
     try {
       Taro.showLoading({ title: '删除中...' })
       await deleteBaby(babyId)
+      // 清除首页缓存
+      clearIndexCache()
       Taro.hideLoading()
       Taro.showToast({ title: '删除成功', icon: 'success' })
       await loadBabies()

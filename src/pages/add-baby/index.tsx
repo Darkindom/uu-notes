@@ -2,6 +2,7 @@ import { View, Text, Input, Button, Picker } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { createBaby, getCurrentUser } from '../../utils/db'
+import { clearIndexCache } from '../../utils/cache'
 import './index.less'
 
 const ROLES = ['妈妈', '爸爸', '奶奶', '爷爷', '外婆', '外公', '其他']
@@ -47,6 +48,8 @@ export default function AddBabyPage() {
         throw new Error('创建宝宝信息失败')
       }
 
+      // 清除首页缓存，强制重新加载新宝宝信息
+      clearIndexCache()
       Taro.showToast({ title: '添加成功！', icon: 'success' })
       setTimeout(() => {
         Taro.reLaunch({ url: '/pages/index/index' })
