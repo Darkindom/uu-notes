@@ -12,11 +12,9 @@ const MENU_ITEMS = [
 ]
 
 export default function Index() {
-  const [loading, setLoading] = useState(true)
   const [babyName, setBabyName] = useState('')
 
   useDidShow(async () => {
-    setLoading(true)
     try {
       // 检查是否首次使用（没有用户信息）
       const firstTime = await isFirstTime()
@@ -37,40 +35,32 @@ export default function Index() {
     } catch (error) {
       console.error('加载数据失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
-    } finally {
-      setLoading(false)
     }
   })
 
   return (
     <View className='index-page'>
-      {loading ? (
-        <View className='loading-container'>
-          <Text>加载中...</Text>
+      <View className='content'>
+        <View className='title-section'>
+          <Text className='baby-title'>{babyName || '宝宝'} 的日常</Text>
         </View>
-      ) : (
-        <View className='content'>
-          <View className='title-section'>
-            <Text className='baby-title'>{babyName} 的日常</Text>
-          </View>
-          
-          <View className='grid'>
-            {MENU_ITEMS.map((item) => (
-              <View
-                key={item.label}
-                className='menu-btn'
-                style={{ background: item.bg, borderColor: item.color }}
-                onClick={() => Taro.navigateTo({ url: item.path })}
-              >
-                <Text className='menu-emoji'>{item.emoji}</Text>
-                <Text className='menu-label' style={{ color: item.color }}>
-                  {item.label}
-                </Text>
-              </View>
-            ))}
-          </View>
+        
+        <View className='grid'>
+          {MENU_ITEMS.map((item) => (
+            <View
+              key={item.label}
+              className='menu-btn'
+              style={{ background: item.bg, borderColor: item.color }}
+              onClick={() => Taro.navigateTo({ url: item.path })}
+            >
+              <Text className='menu-emoji'>{item.emoji}</Text>
+              <Text className='menu-label' style={{ color: item.color }}>
+                {item.label}
+              </Text>
+            </View>
+          ))}
         </View>
-      )}
+      </View>
     </View>
   )
 }
