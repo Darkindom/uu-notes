@@ -122,7 +122,7 @@ export default function FoodPage() {
         )}
 
         {/* Food type */}
-        <View className='section'>
+        <View className='section food-type-section'>
           <Text className='field-label'>类型</Text>
           <View className='options-row'>
             {FOOD_TYPES.map(ft => (

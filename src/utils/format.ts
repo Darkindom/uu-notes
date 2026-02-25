@@ -74,7 +74,8 @@ export function formatRecordSummary(record: Record): string {
   if (sub === 'big') {
     const color = SHIT_COLORS.find((c) => c.value === extra.color)?.label ?? ''
     const hardness = SHIT_HARDNESS.find((h) => h.value === extra.hardness)?.label ?? ''
-    return `${AMOUNT_LABELS[parseInt(val)] ?? val} ${color} ${hardness}`.trim()
+    const amount = AMOUNT_LABELS[parseInt(val)] ? `量${AMOUNT_LABELS[parseInt(val)]}` : val
+    return `${amount} ${color} ${hardness}`.trim()
   }
   if (sub === 'small') {
     return `小便 ${AMOUNT_LABELS[parseInt(val)] ?? val}`

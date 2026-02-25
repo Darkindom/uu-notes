@@ -13,9 +13,10 @@ const MENU_ITEMS = [
 
 export default function Index() {
   const [babyName, setBabyName] = useState('')
-  const [showSkeleton, setShowSkeleton] = useState(true)
+  const [loading, setLoading] = useState(true)
 
   useDidShow(async () => {
+    setLoading(true)
     try {
       // 检查是否首次使用（没有用户信息）
       const firstTime = await isFirstTime()
@@ -37,8 +38,7 @@ export default function Index() {
       console.error('加载数据失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
     } finally {
-      // 延迟隐藏骨架屏，确保数据已加载
-      setTimeout(() => setShowSkeleton(false), 300)
+      setLoading(false)
     }
   })
 
@@ -46,8 +46,8 @@ export default function Index() {
     <View className='index-page'>
       <View className='content'>
         <View className='title-section'>
-          <Text className={`baby-title ${showSkeleton ? 'skeleton' : ''}`}>
-            {showSkeleton ? '加载中' : `${babyName} 的日常`}
+          <Text className='baby-title'>
+            {loading ? '加载中' : `${babyName} 的日常`}
           </Text>
         </View>
         
@@ -55,18 +55,14 @@ export default function Index() {
           {MENU_ITEMS.map((item) => (
             <View
               key={item.label}
-              className={`menu-btn ${showSkeleton ? 'skeleton-btn' : ''}`}
+              className='menu-btn'
               style={{ background: item.bg, borderColor: item.color }}
-              onClick={() => !showSkeleton && Taro.navigateTo({ url: item.path })}
+              onClick={() => !loading && Taro.navigateTo({ url: item.path })}
             >
-              {!showSkeleton && (
-                <>
-                  <Text className='menu-emoji'>{item.emoji}</Text>
-                  <Text className='menu-label' style={{ color: item.color }}>
-                    {item.label}
-                  </Text>
-                </>
-              )}
+              <Text className='menu-emoji'>{item.emoji}</Text>
+              <Text className='menu-label' style={{ color: item.color }}>
+                {item.label}
+              </Text>
             </View>
           ))}
         </View>
