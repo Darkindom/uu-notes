@@ -35,5 +35,7 @@
     "ignore": [],
     "include": []
   },
-  "editorSetting": {}
+  "editorSetting": {},
+  "cloudfunctionRoot": "cloud/",
+  "cloudbaseRoot": "cloud/"
 }

@@ -1,8 +1,7 @@
 import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
-import { getRecentRecords } from '../../utils/db'
-import { formatTimestamp, formatRecordSummary, CATEGORY_LABELS } from '../../utils/format'
+import { isFirstTime, getCurrentBaby } from '../../utils/db'
 import './index.less'
 
 const MENU_ITEMS = [
@@ -13,69 +12,65 @@ const MENU_ITEMS = [
 ]
 
 export default function Index() {
-  const [recentRecords, setRecentRecords] = useState<ReturnType<typeof getRecentRecords>>([])
+  const [loading, setLoading] = useState(true)
+  const [babyName, setBabyName] = useState('')
 
-  useDidShow(() => {
-    setRecentRecords(getRecentRecords(5))
+  useDidShow(async () => {
+    setLoading(true)
+    try {
+      // 检查是否首次使用（没有用户信息）
+      const firstTime = await isFirstTime()
+      if (firstTime) {
+        Taro.redirectTo({ url: '/pages/onboarding/index' })
+        return
+      }
+
+      // 有用户信息，检查是否有当前宝宝
+      const baby = await getCurrentBaby()
+      if (!baby) {
+        // 有用户但没有宝宝，跳转到宝宝选择页面（可以添加新宝宝）
+        Taro.switchTab({ url: '/pages/baby-selector/index' })
+        return
+      }
+
+      setBabyName(baby.name)
+    } catch (error) {
+      console.error('加载数据失败:', error)
+      Taro.showToast({ title: '加载失败', icon: 'none' })
+    } finally {
+      setLoading(false)
+    }
   })
 
   return (
     <View className='index-page'>
-      <View className='grid'>
-        {MENU_ITEMS.map((item) => (
-          <View
-            key={item.label}
-            className='menu-btn'
-            style={{ background: item.bg, borderColor: item.color }}
-            onClick={() => Taro.navigateTo({ url: item.path })}
-          >
-            <Text className='menu-emoji'>{item.emoji}</Text>
-            <Text className='menu-label' style={{ color: item.color }}>
-              {item.label}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <View className='recent-section'>
-        <View className='recent-header'>
-          <Text className='recent-title'>最近记录</Text>
-          <Text
-            className='view-all'
-            onClick={() => Taro.navigateTo({ url: '/pages/records/index' })}
-          >
-            查看全部 &gt;
-          </Text>
+      {loading ? (
+        <View className='loading-container'>
+          <Text>加载中...</Text>
         </View>
-
-        {recentRecords.length === 0 ? (
-          <View className='empty-tip'>
-            <Text className='empty-text'>还没有记录，快来添加吧~</Text>
+      ) : (
+        <View className='content'>
+          <View className='title-section'>
+            <Text className='baby-title'>{babyName} 的日常</Text>
           </View>
-        ) : (
-          recentRecords.map((record) => (
-            <View key={record.id} className='record-item'>
+          
+          <View className='grid'>
+            {MENU_ITEMS.map((item) => (
               <View
-                className='record-tag'
-                style={{
-                  background:
-                    MENU_ITEMS.find((m) => m.label === CATEGORY_LABELS[record.category])?.bg ??
-                    '#f5f5f5',
-                  color:
-                    MENU_ITEMS.find((m) => m.label === CATEGORY_LABELS[record.category])?.color ??
-                    '#666',
-                }}
+                key={item.label}
+                className='menu-btn'
+                style={{ background: item.bg, borderColor: item.color }}
+                onClick={() => Taro.navigateTo({ url: item.path })}
               >
-                <Text>{CATEGORY_LABELS[record.category]}</Text>
+                <Text className='menu-emoji'>{item.emoji}</Text>
+                <Text className='menu-label' style={{ color: item.color }}>
+                  {item.label}
+                </Text>
               </View>
-              <View className='record-info'>
-                <Text className='record-summary'>{formatRecordSummary(record)}</Text>
-                <Text className='record-time'>{formatTimestamp(record.timestamp)}</Text>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   )
 }

@@ -35,32 +35,52 @@ function groupByDate(records: ReturnType<typeof getAllRecords>) {
 }
 
 export default function RecordsPage() {
-  const [records, setRecords] = useState<ReturnType<typeof getAllRecords>>([])
+  const [records, setRecords] = useState<Awaited<ReturnType<typeof getAllRecords>>>([])
+  const [loading, setLoading] = useState(true)
 
-  useDidShow(() => {
-    setRecords(getAllRecords())
+  useDidShow(async () => {
+    setLoading(true)
+    try {
+      const data = await getAllRecords()
+      setRecords(data)
+    } catch (error) {
+      console.error('加载记录失败:', error)
+      Taro.showToast({ title: '加载失败', icon: 'none' })
+    } finally {
+      setLoading(false)
+    }
   })
 
-  function handleDelete(id: string) {
-    Taro.showModal({
+  async function handleDelete(id: string) {
+    const res = await Taro.showModal({
       title: '确认删除',
       content: '确定要删除这条记录吗？',
       confirmText: '删除',
       confirmColor: '#ff4444',
-      success(res) {
-        if (res.confirm) {
-          deleteRecord(id)
-          setRecords(getAllRecords())
-        }
-      },
     })
+    
+    if (res.confirm) {
+      try {
+        await deleteRecord(id)
+        Taro.showToast({ title: '删除成功', icon: 'success' })
+        const data = await getAllRecords()
+        setRecords(data)
+      } catch (error) {
+        console.error('删除失败:', error)
+        Taro.showToast({ title: '删除失败', icon: 'none' })
+      }
+    }
   }
 
   const groups = groupByDate(records)
 
   return (
     <ScrollView className='records-page' scrollY>
-      {groups.length === 0 ? (
+      {loading ? (
+        <View className='loading-state'>
+          <Text>加载中...</Text>
+        </View>
+      ) : groups.length === 0 ? (
         <View className='empty-state'>
           <Text className='empty-icon'>📋</Text>
           <Text className='empty-text'>还没有任何记录</Text>
@@ -75,7 +95,7 @@ export default function RecordsPage() {
             </View>
 
             {group.records.map(record => (
-              <View key={record.id} className='record-card'>
+              <View key={record._id} className='record-card'>
                 <View
                   className='category-badge'
                   style={{
@@ -88,8 +108,9 @@ export default function RecordsPage() {
                 <View className='record-body'>
                   <Text className='record-summary'>{formatRecordSummary(record)}</Text>
                   <Text className='record-time'>{formatTimestamp(record.timestamp)}</Text>
+                  <Text className='record-reporter'>👤 {record.reporter.role}</Text>
                 </View>
-                <View className='delete-btn' onClick={() => handleDelete(record.id)}>
+                <View className='delete-btn' onClick={() => handleDelete(record._id)}>
                   <Text className='delete-icon'>✕</Text>
                 </View>
               </View>
