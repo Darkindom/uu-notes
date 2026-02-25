@@ -17,6 +17,18 @@ function App({ children }: PropsWithChildren<any>) {
         traceUser: true,
       })
       console.log('Cloud initialized with env:', CLOUD_ENV_ID)
+      
+      // 预加载：提前调用一次云函数来"热身"
+      setTimeout(() => {
+        Taro.cloud.callFunction({
+          name: 'login',
+          data: {}
+        }).then(() => {
+          console.log('预加载：云函数已预热')
+        }).catch(err => {
+          console.log('预加载失败（正常）:', err)
+        })
+      }, 100)
     }
   })
 

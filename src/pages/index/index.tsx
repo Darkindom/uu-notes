@@ -13,6 +13,7 @@ const MENU_ITEMS = [
 
 export default function Index() {
   const [babyName, setBabyName] = useState('')
+  const [showSkeleton, setShowSkeleton] = useState(true)
 
   useDidShow(async () => {
     try {
@@ -35,6 +36,9 @@ export default function Index() {
     } catch (error) {
       console.error('加载数据失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
+    } finally {
+      // 延迟隐藏骨架屏，确保数据已加载
+      setTimeout(() => setShowSkeleton(false), 300)
     }
   })
 
@@ -42,21 +46,27 @@ export default function Index() {
     <View className='index-page'>
       <View className='content'>
         <View className='title-section'>
-          <Text className='baby-title'>{babyName || '宝宝'} 的日常</Text>
+          <Text className={`baby-title ${showSkeleton ? 'skeleton' : ''}`}>
+            {showSkeleton ? '加载中' : `${babyName} 的日常`}
+          </Text>
         </View>
         
         <View className='grid'>
           {MENU_ITEMS.map((item) => (
             <View
               key={item.label}
-              className='menu-btn'
+              className={`menu-btn ${showSkeleton ? 'skeleton-btn' : ''}`}
               style={{ background: item.bg, borderColor: item.color }}
-              onClick={() => Taro.navigateTo({ url: item.path })}
+              onClick={() => !showSkeleton && Taro.navigateTo({ url: item.path })}
             >
-              <Text className='menu-emoji'>{item.emoji}</Text>
-              <Text className='menu-label' style={{ color: item.color }}>
-                {item.label}
-              </Text>
+              {!showSkeleton && (
+                <>
+                  <Text className='menu-emoji'>{item.emoji}</Text>
+                  <Text className='menu-label' style={{ color: item.color }}>
+                    {item.label}
+                  </Text>
+                </>
+              )}
             </View>
           ))}
         </View>
