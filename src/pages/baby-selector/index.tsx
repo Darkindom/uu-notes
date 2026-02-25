@@ -16,10 +16,7 @@ export default function BabySelectorPage() {
   async function loadBabies() {
     setLoading(true)
     try {
-      const [babyList, user] = await Promise.all([
-        getUserBabies(),
-        getCurrentUser()
-      ])
+      const [babyList, user] = await Promise.all([getUserBabies(), getCurrentUser()])
       setBabies(babyList)
       setCurrentBabyId(user?.currentBabyId || '')
     } catch (error) {
@@ -57,13 +54,13 @@ export default function BabySelectorPage() {
 
   async function handleDelete(babyId: string, babyName: string, e: any) {
     e.stopPropagation()
-    
+
     const res = await Taro.showModal({
       title: '确认删除',
       content: `确定要删除宝宝"${babyName}"吗？删除后所有相关记录将被清空且无法恢复。`,
       confirmText: '删除',
       cancelText: '取消',
-      confirmColor: '#ff4d4f'
+      confirmColor: '#ff4d4f',
     })
 
     if (!res.confirm) return
@@ -74,7 +71,7 @@ export default function BabySelectorPage() {
       Taro.hideLoading()
       Taro.showToast({ title: '删除成功', icon: 'success' })
       await loadBabies()
-      
+
       // 如果删除的是当前选中的宝宝，重新加载页面
       if (babyId === currentBabyId) {
         setTimeout(() => {
@@ -83,9 +80,9 @@ export default function BabySelectorPage() {
       }
     } catch (error: any) {
       Taro.hideLoading()
-      Taro.showToast({ 
-        title: error.message || '删除失败', 
-        icon: 'none' 
+      Taro.showToast({
+        title: error.message || '删除失败',
+        icon: 'none',
       })
     }
   }
@@ -94,7 +91,7 @@ export default function BabySelectorPage() {
     const now = Date.now()
     const diff = now - birthday
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
+
     if (days < 30) {
       return `${days}天`
     } else if (days < 365) {
@@ -129,9 +126,7 @@ export default function BabySelectorPage() {
                   className={`baby-card ${baby._id === currentBabyId ? 'active' : ''}`}
                 >
                   <View className='baby-content' onClick={() => handleSwitch(baby._id)}>
-                    <View className='baby-avatar'>
-                      {baby.gender === 'male' ? '👦' : '👧'}
-                    </View>
+                    <View className='baby-avatar'>{baby.gender === 'male' ? '👦' : '👧'}</View>
                     <View className='baby-info'>
                       <Text className='baby-name'>{baby.name}</Text>
                       <Text className='baby-age'>{getAge(baby.birthday)}</Text>
@@ -144,8 +139,8 @@ export default function BabySelectorPage() {
                     )}
                   </View>
                   <View className='baby-actions'>
-                    <Button 
-                      className='delete-btn' 
+                    <Button
+                      className='delete-btn'
                       size='mini'
                       onClick={(e) => handleDelete(baby._id, baby.name, e)}
                     >
@@ -160,6 +155,10 @@ export default function BabySelectorPage() {
           <Button className='add-baby-btn' onClick={handleAddBaby}>
             + 添加新宝宝
           </Button>
+
+          <View className='coming-soon-section'>
+            <Text className='coming-soon-text'>图表功能开发中...</Text>
+          </View>
         </>
       )}
     </View>
