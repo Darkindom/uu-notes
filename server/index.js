@@ -103,12 +103,26 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { code } = req.body
 
-    // TODO: 调用微信 API 获取 openId
-    // const wxRes = await fetch(`https://api.weixin.qq.com/sns/jscode2session?appid=YOUR_APPID&secret=YOUR_SECRET&js_code=${code}&grant_type=authorization_code`)
-    // const { openid } = await wxRes.json()
+    // 调用微信 API 获取 openId
+    const APPID = process.env.WECHAT_APPID
+    const SECRET = process.env.WECHAT_SECRET
 
-    // 暂时使用 mock 数据（需要替换为真实的微信登录）
-    const openId = `mock_${code}`
+    if (!APPID || !SECRET) {
+      console.error('缺少微信配置: WECHAT_APPID 或 WECHAT_SECRET')
+      return res.status(500).json({ error: '服务器配置错误' })
+    }
+
+    const wxRes = await fetch(
+      `https://api.weixin.qq.com/sns/jscode2session?appid=${APPID}&secret=${SECRET}&js_code=${code}&grant_type=authorization_code`
+    )
+    const wxData = await wxRes.json()
+
+    if (wxData.errcode) {
+      console.error('微信登录失败:', wxData)
+      return res.status(400).json({ error: wxData.errmsg || '微信登录失败' })
+    }
+
+    const openId = wxData.openid
 
     // 查找或创建用户
     let user = db.prepare('SELECT * FROM users WHERE openId = ?').get(openId)

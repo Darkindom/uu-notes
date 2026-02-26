@@ -1,7 +1,7 @@
 import { View, Text, Input, Button, Picker } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
-import { createBaby, createUser } from '../../utils/db'
+import { createBaby, login, updateUser } from '../../utils/api'
 import './index.less'
 
 const ROLES = ['妈妈', '爸爸', '奶奶', '爷爷', '外婆', '外公', '其他']
@@ -58,19 +58,21 @@ export default function OnboardingPage() {
 
     setLoading(true)
     try {
-      // 1. 创建用户
-      const user = await createUser({ nickname })
+      // 1. 先登录获取 token
+      const user = await login()
       if (!user) {
-        throw new Error('创建用户失败')
+        throw new Error('登录失败')
       }
 
-      // 2. 创建宝宝
+      // 2. 更新用户昵称
+      await updateUser({ nickname })
+
+      // 3. 创建宝宝
       const baby = await createBaby({
         name: babyName,
         gender,
         birthday: new Date(birthday).getTime(),
         role,
-        nickname
       })
       
       if (!baby) {
