@@ -1,7 +1,7 @@
 import Taro from '@tarojs/taro'
 
 // API 配置
-const API_BASE = 'https://your-domain.com/api' // 替换为你的域名
+const API_BASE = 'https://dksiuu.top/api'
 
 // 获取 token
 const getToken = (): string | null => {
