@@ -15,7 +15,19 @@ export default function SleepPage() {
 
   useLoad(async () => {
     const records = await getRecentByCategory('sleep')
-    setRecentRecords(records)
+    // 去重：使用 formatRecordSummary 生成的摘要作为唯一标识
+    const uniqueRecords: DbRecord[] = []
+    const seen = new Set<string>()
+    
+    for (const record of records) {
+      const summary = formatRecordSummary(record)
+      if (!seen.has(summary)) {
+        seen.add(summary)
+        uniqueRecords.push(record)
+      }
+    }
+    
+    setRecentRecords(uniqueRecords)
   })
 
   function applyPrefill(r: DbRecord) {
@@ -67,20 +79,6 @@ export default function SleepPage() {
           </View>
         </View>
 
-        {/* Prefill */}
-        {recentRecords.length > 0 && (
-          <View className='section section-vertical'>
-            <Text className='field-label'>历史预填</Text>
-            <View className='prefill-row'>
-              {recentRecords.map((r) => (
-                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
-                  <Text>{formatRecordSummary(r)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* Duration */}
         <View className='section'>
           <Text className='field-label'>睡眠时长</Text>
@@ -119,6 +117,20 @@ export default function SleepPage() {
             ))}
           </View>
         </View>
+
+        {/* Prefill - 移到最下面 */}
+        {recentRecords.length > 0 && (
+          <View className='section section-vertical'>
+            <Text className='field-label'>历史预填</Text>
+            <View className='prefill-row'>
+              {recentRecords.map((r) => (
+                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                  <Text>{formatRecordSummary(r)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
       </View>
 
       <Button className='submit-btn' onClick={handleSubmit}>

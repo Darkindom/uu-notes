@@ -24,7 +24,19 @@ export default function OtherPage() {
 
   useLoad(async () => {
     const records = await getRecentByCategory('other')
-    setRecentRecords(records)
+    // 去重：使用 formatRecordSummary 生成的摘要作为唯一标识
+    const uniqueRecords: DbRecord[] = []
+    const seen = new Set<string>()
+    
+    for (const record of records) {
+      const summary = formatRecordSummary(record)
+      if (!seen.has(summary)) {
+        seen.add(summary)
+        uniqueRecords.push(record)
+      }
+    }
+    
+    setRecentRecords(uniqueRecords)
   })
 
   function applyPrefill(r: DbRecord) {
@@ -103,20 +115,6 @@ export default function OtherPage() {
           </View>
         </View>
 
-        {/* Prefill */}
-        {recentRecords.length > 0 && (
-          <View className='section section-vertical'>
-            <Text className='field-label'>历史预填</Text>
-            <View className='prefill-row'>
-              {recentRecords.map(r => (
-                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
-                  <Text>{formatRecordSummary(r)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* Tonic */}
         {subType === 'tonic' && (
           <View className='section'>
@@ -148,6 +146,20 @@ export default function OtherPage() {
                 onInput={(e) => setDuration(e.detail.value)}
               />
               <Text className='unit-text'>分钟</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Prefill - 移到最下面 */}
+        {recentRecords.length > 0 && (
+          <View className='section section-vertical'>
+            <Text className='field-label'>历史预填</Text>
+            <View className='prefill-row'>
+              {recentRecords.map(r => (
+                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                  <Text>{formatRecordSummary(r)}</Text>
+                </View>
+              ))}
             </View>
           </View>
         )}

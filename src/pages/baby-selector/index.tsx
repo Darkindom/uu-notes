@@ -9,6 +9,8 @@ export default function BabySelectorPage() {
   const [babies, setBabies] = useState<Baby[]>([])
   const [currentBabyId, setCurrentBabyId] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [showMembersModal, setShowMembersModal] = useState(false)
+  const [selectedBaby, setSelectedBaby] = useState<Baby | null>(null)
 
   useLoad(async () => {
     await loadBabies()
@@ -109,6 +111,25 @@ export default function BabySelectorPage() {
     }
   }
 
+  function handleViewMembers(baby: Baby, e: any) {
+    e.stopPropagation()
+    setSelectedBaby(baby)
+    setShowMembersModal(true)
+  }
+
+  function handleShare() {
+    if (!selectedBaby) return {
+      title: '宝宝成长记录',
+      path: '/pages/index/index'
+    }
+
+    return {
+      title: `邀请你加入「${selectedBaby.name}」的成长记录`,
+      path: `/pages/index/index?babyId=${selectedBaby._id}&inviteFrom=share`,
+      imageUrl: ''
+    }
+  }
+
   return (
     <View className='page-container baby-selector-page'>
       {loading ? (
@@ -145,6 +166,13 @@ export default function BabySelectorPage() {
                   </View>
                   <View className='baby-actions'>
                     <Button
+                      className='view-members-btn'
+                      size='mini'
+                      onClick={(e) => handleViewMembers(baby, e)}
+                    >
+                      查看成员
+                    </Button>
+                    <Button
                       className='delete-btn'
                       size='mini'
                       onClick={(e) => handleDelete(baby._id, baby.name, e)}
@@ -165,6 +193,43 @@ export default function BabySelectorPage() {
             <Text className='coming-soon-text'>图表功能开发中...</Text>
           </View>
         </>
+      )}
+
+      {/* 成员列表弹窗 */}
+      {showMembersModal && selectedBaby && (
+        <View className='modal-overlay' onClick={() => setShowMembersModal(false)}>
+          <View className='members-modal' onClick={(e) => e.stopPropagation()}>
+            <View className='modal-header'>
+              <Text className='modal-title'>{selectedBaby.name} 的成员</Text>
+              <View className='close-btn' onClick={() => setShowMembersModal(false)}>
+                <Text>✕</Text>
+              </View>
+            </View>
+            <View className='members-list'>
+              {selectedBaby.members.map((member, index) => (
+                <View key={index} className='member-item'>
+                  <View className='member-icon'>👤</View>
+                  <View className='member-info'>
+                    <Text className='member-name'>{member.nickname}</Text>
+                    <Text className='member-role'>{member.role}</Text>
+                  </View>
+                  <View className='member-badge'>
+                    <Text>{member.permission === 'admin' ? '管理员' : '成员'}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+            <View className='modal-footer'>
+              <Button 
+                className='invite-btn' 
+                openType='share'
+                onShareAppMessage={handleShare}
+              >
+                邀请成员
+              </Button>
+            </View>
+          </View>
+        </View>
       )}
     </View>
   )
