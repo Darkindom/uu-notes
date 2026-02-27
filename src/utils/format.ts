@@ -1,4 +1,6 @@
-import type { Record } from './db'
+// 已迁移到自建后端 API
+import type { Record } from './api'
+// import type { Record } from './db' // 云开发已废弃
 
 export const AMOUNT_LABELS = ['少', '中', '多']
 export const AMOUNT_VALUES = ['0', '1', '2']
@@ -20,7 +22,7 @@ export const SHIT_HARDNESS = [
 
 export const TONIC_TYPES = ['AD', 'D3', '钙', '铁', '锌', '其他']
 
-export const SUBCATEGORY_LABELS: Record<string, string> = {
+export const SUBCATEGORY_LABELS: { [key: string]: string } = {
   breast_milk: '母乳',
   milk: '奶粉',
   water: '水',
@@ -33,7 +35,7 @@ export const SUBCATEGORY_LABELS: Record<string, string> = {
   cry: '哭闹',
 }
 
-export const CATEGORY_LABELS: Record<string, string> = {
+export const CATEGORY_LABELS: { [key: string]: string } = {
   food: '吃',
   sleep: '睡',
   shit: '拉',
@@ -50,9 +52,9 @@ export function formatTimestamp(ts: number): string {
 }
 
 export function formatRecordSummary(record: Record): string {
-  const sub = record.subcategory
-  const val = record.value
-  const extra = record.extra ? JSON.parse(record.extra) : {}
+  const sub = record.subCategory || ''
+  const val = record.value || ''
+  const extra = (record.extra as any) || {}
 
   if (sub === 'breast_milk' || sub === 'milk') {
     return `${SUBCATEGORY_LABELS[sub]} ${val}ml`

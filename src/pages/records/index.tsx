@@ -1,8 +1,10 @@
-import { View, Text, Button, ScrollView } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
-import { getAllRecords, deleteRecord } from '../../utils/db'
-import type { Record } from '../../utils/db'
+// 已迁移到自建后端 API
+import { getRecords, deleteRecord, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
+// import { getAllRecords, deleteRecord } from '../../utils/db' // 云开发已废弃
+// import type { Record } from '../../utils/db' // 云开发已废弃
 import {
   formatTimestamp,
   formatRecordSummary,
@@ -17,12 +19,12 @@ const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
   other: { bg: '#EDFBF3', color: '#4CAF7D' },
 }
 
-function groupByDate(records: ReturnType<typeof getAllRecords>) {
-  const groups: { date: string; records: typeof records }[] = []
-  const map: Record<string, typeof records> = {}
+function groupByDate(records: ApiRecord[]) {
+  const groups: { date: string; records: ApiRecord[] }[] = []
+  const map: Record<string, ApiRecord[]> = {}
 
   records.forEach(r => {
-    const d = new Date(r.timestamp)
+    const d = new Date(r.startTime)
     const key = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
     if (!map[key]) {
       map[key] = []
@@ -35,13 +37,18 @@ function groupByDate(records: ReturnType<typeof getAllRecords>) {
 }
 
 export default function RecordsPage() {
-  const [records, setRecords] = useState<Awaited<ReturnType<typeof getAllRecords>>>([])
+  const [records, setRecords] = useState<ApiRecord[]>([])
   const [loading, setLoading] = useState(true)
 
   useDidShow(async () => {
     setLoading(true)
     try {
-      const data = await getAllRecords()
+      const baby = await getCurrentBaby()
+      if (!baby) {
+        setRecords([])
+        return
+      }
+      const data = await getRecords({ babyId: baby.id, limit: 100 })
       setRecords(data)
     } catch (error) {
       console.error('加载记录失败:', error)
@@ -51,7 +58,7 @@ export default function RecordsPage() {
     }
   })
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: number) {
     const res = await Taro.showModal({
       title: '确认删除',
       content: '确定要删除这条记录吗？',
@@ -63,8 +70,12 @@ export default function RecordsPage() {
       try {
         await deleteRecord(id)
         Taro.showToast({ title: '删除成功', icon: 'success' })
-        const data = await getAllRecords()
-        setRecords(data)
+        // 重新加载数据
+        const baby = await getCurrentBaby()
+        if (baby) {
+          const data = await getRecords({ babyId: baby.id, limit: 100 })
+          setRecords(data)
+        }
       } catch (error) {
         console.error('删除失败:', error)
         Taro.showToast({ title: '删除失败', icon: 'none' })
@@ -95,7 +106,7 @@ export default function RecordsPage() {
             </View>
 
             {group.records.map(record => (
-              <View key={record._id} className='record-card'>
+              <View key={record.id} className='record-card'>
                 <View
                   className='category-badge'
                   style={{
@@ -107,10 +118,10 @@ export default function RecordsPage() {
                 </View>
                 <View className='record-body'>
                   <Text className='record-summary'>{formatRecordSummary(record)}</Text>
-                  <Text className='record-time'>{formatTimestamp(record.timestamp)}</Text>
-                  <Text className='record-reporter'>👤 {record.reporter.role}</Text>
+                  <Text className='record-time'>{formatTimestamp(record.startTime)}</Text>
+                  <Text className='record-reporter'>👤 记录人 {record.reporterId}</Text>
                 </View>
-                <View className='delete-btn' onClick={() => handleDelete(record._id)}>
+                <View className='delete-btn' onClick={() => handleDelete(record.id)}>
                   <Text className='delete-icon'>✕</Text>
                 </View>
               </View>

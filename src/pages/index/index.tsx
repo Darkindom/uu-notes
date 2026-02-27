@@ -1,7 +1,7 @@
 import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
-import { isFirstTime, getCurrentBaby } from '../../utils/db'
+import { getCurrentBaby, checkLogin } from '../../utils/api'
 import { getIndexCache, setIndexCache } from '../../utils/cache'
 import './index.less'
 
@@ -37,18 +37,18 @@ export default function Index() {
     // 缓存无效或不存在，重新加载
     setLoading(true)
     try {
-      // 检查是否首次使用（没有用户信息）
-      const firstTime = await isFirstTime()
-      if (firstTime) {
+      // 检查是否已登录
+      const isLoggedIn = await checkLogin()
+      if (!isLoggedIn) {
         Taro.redirectTo({ url: '/pages/onboarding/index' })
         return
       }
 
-      // 有用户信息，检查是否有当前宝宝
+      // 已登录，检查是否有当前宝宝
       const baby = await getCurrentBaby()
       if (!baby) {
-        // 有用户但没有宝宝，跳转到宝宝选择页面（可以添加新宝宝）
-        Taro.switchTab({ url: '/pages/baby-selector/index' })
+        // 有用户但没有宝宝，跳转到添加宝宝页面
+        Taro.redirectTo({ url: '/pages/onboarding/index?step=2' })
         return
       }
 

@@ -7,9 +7,14 @@ function App({ children }: PropsWithChildren<any>) {
   useLaunch(() => {
     console.log('App launched.')
     console.log('使用自建后端 API: https://dksiuu.top/api')
-    
-    // 不再使用云开发，改用自建后端
-    // 云开发初始化已禁用
+
+    // ========================================
+    // 云开发所有功能已迁移到自建后端
+    // ========================================
+    // 自建后端 API 地址: https://dksiuu.top/api
+    // 数据库: SQLite (NAS 本地存储)
+    // 认证方式: JWT Token
+    // ========================================
   })
 
   // children 是将要会渲染的页面

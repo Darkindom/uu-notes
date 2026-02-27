@@ -1,13 +1,13 @@
 import { View, Text, Button } from '@tarojs/components'
-import Taro, { useLoad } from '@tarojs/taro'
+import Taro, { useLoad, useShareAppMessage } from '@tarojs/taro'
 import { useState } from 'react'
-import { getUserBabies, switchBaby, getCurrentUser, deleteBaby, type Baby } from '../../utils/db'
+import { getBabies, switchBaby, getCurrentUser, deleteBaby, type Baby } from '../../utils/api'
 import { clearIndexCache } from '../../utils/cache'
 import './index.less'
 
 export default function BabySelectorPage() {
   const [babies, setBabies] = useState<Baby[]>([])
-  const [currentBabyId, setCurrentBabyId] = useState<string>('')
+  const [currentBabyId, setCurrentBabyId] = useState<number | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [selectedBaby, setSelectedBaby] = useState<Baby | null>(null)
@@ -16,12 +16,25 @@ export default function BabySelectorPage() {
     await loadBabies()
   })
 
+  useShareAppMessage(() => {
+    if (!selectedBaby) {
+      return {
+        title: '宝宝成长记录',
+        path: '/pages/index/index'
+      }
+    }
+    return {
+      title: `邀请你加入「${selectedBaby.name}」的成长记录`,
+      path: `/pages/index/index?babyId=${selectedBaby.id}&inviteFrom=share`,
+    }
+  })
+
   async function loadBabies() {
     setLoading(true)
     try {
-      const [babyList, user] = await Promise.all([getUserBabies(), getCurrentUser()])
+      const [babyList, user] = await Promise.all([getBabies(), getCurrentUser()])
       setBabies(babyList)
-      setCurrentBabyId(user?.currentBabyId || '')
+      setCurrentBabyId(user?.currentBabyId)
     } catch (error) {
       console.error('加载宝宝列表失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
@@ -30,7 +43,7 @@ export default function BabySelectorPage() {
     }
   }
 
-  async function handleSwitch(babyId: string) {
+  async function handleSwitch(babyId: number) {
     if (babyId === currentBabyId) {
       // 如果点击的是当前宝宝，不做任何操作
       return
@@ -57,7 +70,7 @@ export default function BabySelectorPage() {
     Taro.navigateTo({ url: '/pages/add-baby/index' })
   }
 
-  async function handleDelete(babyId: string, babyName: string, e: any) {
+  async function handleDelete(babyId: number, babyName: string, e: any) {
     e.stopPropagation()
 
     const res = await Taro.showModal({
@@ -117,19 +130,6 @@ export default function BabySelectorPage() {
     setShowMembersModal(true)
   }
 
-  function handleShare() {
-    if (!selectedBaby) return {
-      title: '宝宝成长记录',
-      path: '/pages/index/index'
-    }
-
-    return {
-      title: `邀请你加入「${selectedBaby.name}」的成长记录`,
-      path: `/pages/index/index?babyId=${selectedBaby._id}&inviteFrom=share`,
-      imageUrl: ''
-    }
-  }
-
   return (
     <View className='page-container baby-selector-page'>
       {loading ? (
@@ -148,17 +148,17 @@ export default function BabySelectorPage() {
             <View className='baby-list'>
               {babies.map((baby) => (
                 <View
-                  key={baby._id}
-                  className={`baby-card ${baby._id === currentBabyId ? 'active' : ''}`}
+                  key={baby.id}
+                  className={`baby-card ${baby.id === currentBabyId ? 'active' : ''}`}
                 >
-                  <View className='baby-content' onClick={() => handleSwitch(baby._id)}>
+                  <View className='baby-content' onClick={() => handleSwitch(baby.id)}>
                     <View className='baby-avatar'>{baby.gender === 'male' ? '👦' : '👧'}</View>
                     <View className='baby-info'>
                       <Text className='baby-name'>{baby.name}</Text>
                       <Text className='baby-age'>{getAge(baby.birthday)}</Text>
-                      <Text className='baby-members'>{baby.members.length} 位成员</Text>
+                      <Text className='baby-members'>{baby.memberIds?.length || 0} 位成员</Text>
                     </View>
-                    {baby._id === currentBabyId && (
+                    {baby.id === currentBabyId && (
                       <View className='current-badge'>
                         <Text>当前</Text>
                       </View>
@@ -175,7 +175,7 @@ export default function BabySelectorPage() {
                     <Button
                       className='delete-btn'
                       size='mini'
-                      onClick={(e) => handleDelete(baby._id, baby.name, e)}
+                      onClick={(e) => handleDelete(baby.id, baby.name, e)}
                     >
                       删除
                     </Button>
@@ -206,24 +206,26 @@ export default function BabySelectorPage() {
               </View>
             </View>
             <View className='members-list'>
-              {selectedBaby.members.map((member, index) => (
-                <View key={index} className='member-item'>
-                  <View className='member-icon'>👤</View>
-                  <View className='member-info'>
-                    <Text className='member-name'>{member.nickname}</Text>
-                    <Text className='member-role'>{member.role}</Text>
+              {selectedBaby.memberIds && selectedBaby.memberIds.length > 0 ? (
+                selectedBaby.memberIds.map((_, index) => (
+                  <View key={index} className='member-item'>
+                    <View className='member-icon'>👤</View>
+                    <View className='member-info'>
+                      <Text className='member-name'>成员 {index + 1}</Text>
+                      <Text className='member-role'>成员</Text>
+                    </View>
                   </View>
-                  <View className='member-badge'>
-                    <Text>{member.permission === 'admin' ? '管理员' : '成员'}</Text>
-                  </View>
+                ))
+              ) : (
+                <View className='empty-members'>
+                  <Text>暂无成员信息</Text>
                 </View>
-              ))}
+              )}
             </View>
             <View className='modal-footer'>
               <Button 
                 className='invite-btn' 
                 openType='share'
-                onShareAppMessage={handleShare}
               >
                 邀请成员
               </Button>

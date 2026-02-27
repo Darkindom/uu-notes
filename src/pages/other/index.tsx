@@ -1,7 +1,9 @@
 import { View, Text, Input, Picker, Button } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
-import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db'
+// 已迁移到自建后端 API
+import { createRecord, getRecentRecordsByCategory, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
+// import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db' // 云开发已废弃
 import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES, formatRecordSummary } from '../../utils/format'
 import './index.less'
 
@@ -20,49 +22,53 @@ export default function OtherPage() {
   const [subType, setSubType] = useState<SubType>('outdoor')
   const [tonicType, setTonicType] = useState(TONIC_TYPES[0])
   const [duration, setDuration] = useState('')
-  const [recentRecords, setRecentRecords] = useState<DbRecord[]>([])
+  const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
 
   useLoad(async () => {
-    const records = await getRecentByCategory('other')
-    // 去重：使用 formatRecordSummary 生成的摘要作为唯一标识
-    const uniqueRecords: DbRecord[] = []
-    const seen = new Set<string>()
-    
-    for (const record of records) {
-      const summary = formatRecordSummary(record)
-      if (!seen.has(summary)) {
-        seen.add(summary)
-        uniqueRecords.push(record)
+    try {
+      const records = await getRecentRecordsByCategory('other', 5)
+      // 去重：使用 formatRecordSummary 生成的摘要作为唯一标识
+      const uniqueRecords: ApiRecord[] = []
+      const seen = new Set<string>()
+      
+      for (const record of records) {
+        const summary = formatRecordSummary(record)
+        if (!seen.has(summary)) {
+          seen.add(summary)
+          uniqueRecords.push(record)
+        }
       }
+      
+      setRecentRecords(uniqueRecords)
+    } catch (error) {
+      console.error('加载历史记录失败:', error)
     }
-    
-    setRecentRecords(uniqueRecords)
   })
 
-  function applyPrefill(r: DbRecord) {
-    const sub = r.subcategory as SubType
+  function applyPrefill(r: ApiRecord) {
+    const sub = r.subCategory as SubType
     setSubType(sub)
     if (sub === 'tonic') {
       try {
-        const extra = JSON.parse(r.extra || '{}')
-        setTonicType(extra.tonic_type ?? TONIC_TYPES[0])
+        const extra = r.extra as any
+        setTonicType(extra?.tonic_type ?? TONIC_TYPES[0])
       } catch {
         setTonicType(TONIC_TYPES[0])
       }
       setDuration('')
     } else {
-      setDuration(r.value)
+      setDuration(r.value || '')
       setTonicType(TONIC_TYPES[0])
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     let value = ''
-    let extra = ''
+    let extra: any = null
 
     if (subType === 'tonic') {
       value = '1'
-      extra = JSON.stringify({ tonic_type: tonicType })
+      extra = { tonic_type: tonicType }
     } else {
       if (!duration) {
         Taro.showToast({ title: '请输入时长', icon: 'none' })
@@ -71,16 +77,29 @@ export default function OtherPage() {
       value = duration
     }
 
-    addRecord({
-      timestamp: dateTimeToTimestamp(date, time),
-      category: 'other',
-      subcategory: subType,
-      value,
-      extra,
-    })
+    try {
+      const baby = await getCurrentBaby()
+      if (!baby) {
+        Taro.showToast({ title: '请先选择宝宝', icon: 'none' })
+        return
+      }
 
-    Taro.showToast({ title: '记录成功！', icon: 'success' })
-    setTimeout(() => Taro.navigateBack(), 1000)
+      const startTime = dateTimeToTimestamp(date, time)
+      await createRecord({
+        babyId: baby.id,
+        category: 'other',
+        subCategory: subType,
+        startTime,
+        value,
+        extra,
+      })
+
+      Taro.showToast({ title: '记录成功！', icon: 'success' })
+      setTimeout(() => Taro.navigateBack(), 1000)
+    } catch (error) {
+      console.error('记录失败:', error)
+      Taro.showToast({ title: '记录失败', icon: 'none' })
+    }
   }
 
   return (
@@ -156,7 +175,7 @@ export default function OtherPage() {
             <Text className='field-label'>历史预填</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
-                <View key={r._id} className='prefill-chip' onClick={() => applyPrefill(r)}>
+                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
                   <Text>{formatRecordSummary(r)}</Text>
                 </View>
               ))}

@@ -1,7 +1,9 @@
 import { View, Text, Input, Button, Picker } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
-import { createBaby, getCurrentUser } from '../../utils/db'
+// 已迁移到自建后端 API
+import { createBaby } from '../../utils/api'
+// import { createBaby, getCurrentUser } from '../../utils/db' // 云开发已废弃
 import { clearIndexCache } from '../../utils/cache'
 import './index.less'
 
@@ -9,7 +11,6 @@ const ROLES = ['妈妈', '爸爸', '奶奶', '爷爷', '外婆', '外公', '其�
 
 export default function AddBabyPage() {
   const [loading, setLoading] = useState(false)
-  const [userNickname, setUserNickname] = useState('')
   const [role, setRole] = useState('妈妈')
   const [roleIdx, setRoleIdx] = useState(0)
   
@@ -18,10 +19,7 @@ export default function AddBabyPage() {
   const [birthday, setBirthday] = useState('')
 
   useLoad(async () => {
-    const user = await getCurrentUser()
-    if (user) {
-      setUserNickname(user.nickname)
-    }
+    // 不需要获取用户昵称，API 不使用该字段
   })
 
   async function handleSubmit() {
@@ -41,7 +39,6 @@ export default function AddBabyPage() {
         gender,
         birthday: new Date(birthday).getTime(),
         role,
-        nickname: userNickname
       })
       
       if (!baby) {
@@ -119,7 +116,7 @@ export default function AddBabyPage() {
             range={ROLES}
             value={roleIdx}
             onChange={e => {
-              const idx = parseInt(e.detail.value)
+              const idx = parseInt(String(e.detail.value))
               setRoleIdx(idx)
               setRole(ROLES[idx])
             }}
