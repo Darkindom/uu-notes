@@ -1,9 +1,28 @@
 import { View, Text, Button } from '@tarojs/components'
-import Taro, { useLoad, useShareAppMessage } from '@tarojs/taro'
+import Taro, { useLoad, useShareAppMessage, useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
-import { getBabies, switchBaby, getCurrentUser, deleteBaby, type Baby } from '../../utils/api'
+import {
+  getBabies,
+  switchBaby,
+  getCurrentUser,
+  deleteBaby,
+  getRecords,
+  type Baby,
+} from '../../utils/api'
 import { clearIndexCache } from '../../utils/cache'
 import './index.less'
+
+interface TodayStats {
+  milk: number // 奶量 ml
+  food: number // 辅食次数
+  sleep: number // 睡眠次数
+  sleepMinutes: number // 睡眠总分钟数
+  shit: number // 排便次数
+  outdoor: number // 户外次数
+  tonic: number // 补剂次数
+  cry: number // 哭闹次数
+  gearHours: number // 护具佩戴小时数
+}
 
 export default function BabySelectorPage() {
   const [babies, setBabies] = useState<Baby[]>([])
@@ -11,9 +30,17 @@ export default function BabySelectorPage() {
   const [loading, setLoading] = useState(true)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [selectedBaby, setSelectedBaby] = useState<Baby | null>(null)
+  const [todayStats, setTodayStats] = useState<TodayStats | null>(null)
 
   useLoad(async () => {
     await loadBabies()
+  })
+
+  useDidShow(async () => {
+    // 每次显示页面时刷新统计数据
+    if (currentBabyId) {
+      await loadTodayStats(currentBabyId)
+    }
   })
 
   useShareAppMessage(() => {
@@ -35,11 +62,116 @@ export default function BabySelectorPage() {
       const [babyList, user] = await Promise.all([getBabies(), getCurrentUser()])
       setBabies(babyList)
       setCurrentBabyId(user?.currentBabyId)
+
+      // 加载当前宝宝的今日统计
+      if (user?.currentBabyId) {
+        await loadTodayStats(user.currentBabyId)
+      }
     } catch (error) {
       console.error('加载宝宝列表失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadTodayStats(babyId: number) {
+    try {
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date()
+      endOfDay.setHours(23, 59, 59, 999)
+
+      // 使用日期范围参数获取今天的所有记录
+      const response = await getRecords({
+        babyId,
+        limit: 1000,
+        offset: 0,
+        startDate: startOfDay.getTime(),
+        endDate: endOfDay.getTime(),
+      })
+      const todayRecords = response.records
+
+      const stats: TodayStats = {
+        milk: 0,
+        food: 0,
+        sleep: 0,
+        sleepMinutes: 0,
+        shit: 0,
+        outdoor: 0,
+        tonic: 0,
+        cry: 0,
+        gearHours: 0,
+      }
+
+      // 用于计算护具佩戴时间
+      const gearEvents: { type: 'on' | 'off'; time: number }[] = []
+
+      todayRecords.forEach((record) => {
+        switch (record.category) {
+          case 'food':
+            if (record.subCategory === 'breast_milk' || record.subCategory === 'milk') {
+              // 统计奶量
+              stats.milk += parseInt(record.value || '0') || 0
+            } else if (record.subCategory === 'babycook') {
+              // 辅食次数
+              stats.food++
+            }
+            break
+
+          case 'sleep':
+            stats.sleep++
+            stats.sleepMinutes += parseInt(record.value || '0') || 0
+            break
+
+          case 'shit':
+            stats.shit++
+            break
+
+          case 'other':
+            if (record.subCategory === 'outdoor') {
+              stats.outdoor++
+            } else if (record.subCategory === 'tonic') {
+              stats.tonic++
+            } else if (record.subCategory === 'cry') {
+              stats.cry++
+            } else if (record.subCategory === 'gear') {
+              // 收集护具事件
+              const gearType = record.extra?.gear_type
+              if (gearType === '带上') {
+                gearEvents.push({ type: 'on', time: record.startTime })
+              } else if (gearType === '脱下') {
+                gearEvents.push({ type: 'off', time: record.startTime })
+              }
+            }
+            break
+        }
+      })
+
+      // 计算护具佩戴时长
+      gearEvents.sort((a, b) => a.time - b.time)
+      let totalGearMinutes = 0
+      let lastOnTime: number | null = null
+
+      gearEvents.forEach((event) => {
+        if (event.type === 'on') {
+          lastOnTime = event.time
+        } else if (event.type === 'off' && lastOnTime !== null) {
+          totalGearMinutes += (event.time - lastOnTime) / (1000 * 60)
+          lastOnTime = null
+        }
+      })
+
+      // 如果有未脱下的，计算到当前时间
+      if (lastOnTime !== null) {
+        totalGearMinutes += (Date.now() - lastOnTime) / (1000 * 60)
+      }
+
+      stats.gearHours = Math.round((totalGearMinutes / 60) * 10) / 10 // 保留1位小数
+
+      setTodayStats(stats)
+    } catch (error) {
+      console.error('加载今日统计失败:', error)
     }
   }
 
@@ -188,6 +320,83 @@ export default function BabySelectorPage() {
           <Button className='add-baby-btn' onClick={handleAddBaby}>
             + 添加新宝宝
           </Button>
+
+          {/* 今日统计 */}
+          {todayStats && currentBabyId && (
+            <View className='today-stats-section'>
+              <View className='stats-header'>
+                <Text className='stats-title'>今日概况</Text>
+                <Text className='stats-date'>{new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</Text>
+              </View>
+              <View className='stats-content'>
+                {/* 吃 */}
+                {(todayStats.milk > 0 || todayStats.food > 0) && (
+                  <View className='stat-item'>
+                    <Text className='stat-label' style={{ color: '#FF9500' }}>吃</Text>
+                    <Text className='stat-value'>
+                      {todayStats.milk > 0 && `${todayStats.milk} ml 奶`}
+                      {todayStats.milk > 0 && todayStats.food > 0 && '，'}
+                      {todayStats.food > 0 && `${todayStats.food} 顿辅食`}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 睡 */}
+                {todayStats.sleep > 0 && (
+                  <View className='stat-item'>
+                    <Text className='stat-label' style={{ color: '#5B8DEF' }}>睡</Text>
+                    <Text className='stat-value'>
+                      {todayStats.sleep} 次，共 {Math.floor(todayStats.sleepMinutes / 60)} 时{' '}
+                      {todayStats.sleepMinutes % 60} 分
+                    </Text>
+                  </View>
+                )}
+
+                {/* 拉 */}
+                {todayStats.shit > 0 && (
+                  <View className='stat-item'>
+                    <Text className='stat-label' style={{ color: '#8B6E5B' }}>拉</Text>
+                    <Text className='stat-value'>{todayStats.shit} 次</Text>
+                  </View>
+                )}
+
+                {/* 其他 */}
+                {(todayStats.outdoor > 0 ||
+                  todayStats.tonic > 0 ||
+                  todayStats.cry > 0 ||
+                  todayStats.gearHours > 0) && (
+                  <View className='stat-item'>
+                    <Text className='stat-label' style={{ color: '#4CAF7D' }}>其他</Text>
+                    <Text className='stat-value'>
+                      {todayStats.outdoor > 0 && `户外 ${todayStats.outdoor} 次`}
+                      {todayStats.outdoor > 0 &&
+                        (todayStats.tonic > 0 || todayStats.cry > 0 || todayStats.gearHours > 0) &&
+                        '，'}
+                      {todayStats.tonic > 0 && `补剂 ${todayStats.tonic} 次`}
+                      {todayStats.tonic > 0 &&
+                        (todayStats.cry > 0 || todayStats.gearHours > 0) &&
+                        '，'}
+                      {todayStats.cry > 0 && `哭闹 ${todayStats.cry} 次`}
+                      {todayStats.cry > 0 && todayStats.gearHours > 0 && '，'}
+                      {todayStats.gearHours > 0 && `护具 ${todayStats.gearHours} 小时`}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 无数据提示 */}
+                {todayStats.milk === 0 &&
+                  todayStats.food === 0 &&
+                  todayStats.sleep === 0 &&
+                  todayStats.shit === 0 &&
+                  todayStats.outdoor === 0 &&
+                  todayStats.tonic === 0 &&
+                  todayStats.cry === 0 &&
+                  todayStats.gearHours === 0 && (
+                    <Text className='stat-empty'>今天还没有任何记录</Text>
+                  )}
+              </View>
+            </View>
+          )}
 
           <View className='coming-soon-section'>
             <Text className='coming-soon-text'>图表功能开发中...</Text>

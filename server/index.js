@@ -374,7 +374,7 @@ app.delete('/api/babies/:id', verifyToken, (req, res) => {
 
 app.get('/api/records', verifyToken, (req, res) => {
   try {
-    const { babyId, category, limit = 20, offset = 0 } = req.query
+    const { babyId, category, limit = 20, offset = 0, startDate, endDate } = req.query
 
     let query = `
       SELECT r.*, bm.role as reporterRole
@@ -392,6 +392,17 @@ app.get('/api/records', verifyToken, (req, res) => {
     if (category) {
       query += ' AND r.category = ?'
       params.push(category)
+    }
+
+    // 日期范围过滤
+    if (startDate) {
+      query += ' AND r.startTime >= ?'
+      params.push(parseInt(startDate))
+    }
+
+    if (endDate) {
+      query += ' AND r.startTime <= ?'
+      params.push(parseInt(endDate))
     }
 
     query += ' ORDER BY r.startTime DESC LIMIT ? OFFSET ?'
@@ -412,6 +423,17 @@ app.get('/api/records', verifyToken, (req, res) => {
     if (category) {
       countQuery += ' AND r.category = ?'
       countParams.push(category)
+    }
+
+    // 日期范围过滤（计数时也需要）
+    if (startDate) {
+      countQuery += ' AND r.startTime >= ?'
+      countParams.push(parseInt(startDate))
+    }
+
+    if (endDate) {
+      countQuery += ' AND r.startTime <= ?'
+      countParams.push(parseInt(endDate))
     }
     
     const { total } = db.prepare(countQuery).get(...countParams)

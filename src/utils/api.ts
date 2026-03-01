@@ -230,6 +230,8 @@ export const getRecords = (params: {
   category?: string
   limit?: number
   offset?: number
+  startDate?: number  // 开始时间戳
+  endDate?: number    // 结束时间戳
 }): Promise<RecordsResponse> => {
   const query = Object.entries(params)
     .filter(([_, v]) => v !== undefined)
