@@ -24,6 +24,7 @@ export default function ShitPage() {
   const [color, setColor] = useState<string | null>(null)
   const [hardness, setHardness] = useState<string | null>(null)
   const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
+  const [loading, setLoading] = useState(false)
 
   useLoad(async () => {
     try {
@@ -67,6 +68,8 @@ export default function ShitPage() {
   }
 
   async function handleSubmit() {
+    if (loading) return // 防止重复提交
+    
     const extra: Record<string, string> = {}
     if (shitType === 'big') {
       if (color) extra.color = color
@@ -74,6 +77,7 @@ export default function ShitPage() {
     }
 
     try {
+      setLoading(true)
       const baby = await getCurrentBaby()
       if (!baby) {
         Taro.showToast({ title: '请先选择宝宝', icon: 'none' })
@@ -95,6 +99,8 @@ export default function ShitPage() {
     } catch (error) {
       console.error('记录失败:', error)
       Taro.showToast({ title: '记录失败', icon: 'none' })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -165,7 +171,7 @@ export default function ShitPage() {
         {/* Prefill - 移到最下面 */}
         {recentRecords.length > 0 && (
           <View className='section section-vertical'>
-            <Text className='field-label'>历史预填</Text>
+            <Text className='field-label'>最近的记录</Text>
             <View className='prefill-row'>
               {recentRecords.map(r => (
                 <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
@@ -177,7 +183,7 @@ export default function ShitPage() {
         )}
       </View>
 
-      <Button className='submit-btn' onClick={handleSubmit}>
+      <Button className='submit-btn' onClick={handleSubmit} loading={loading} disabled={loading}>
         记录
       </Button>
     </View>

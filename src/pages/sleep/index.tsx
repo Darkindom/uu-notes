@@ -14,6 +14,7 @@ export default function SleepPage() {
   const [hours, setHours] = useState('')
   const [minutes, setMinutes] = useState('')
   const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
+  const [loading, setLoading] = useState(false)
 
   useLoad(async () => {
     try {
@@ -43,6 +44,8 @@ export default function SleepPage() {
   }
 
   async function handleSubmit() {
+    if (loading) return // 防止重复提交
+    
     const h = parseInt(hours) || 0
     const m = parseInt(minutes) || 0
     const totalMinutes = h * 60 + m
@@ -53,6 +56,7 @@ export default function SleepPage() {
     }
 
     try {
+      setLoading(true)
       const baby = await getCurrentBaby()
       if (!baby) {
         Taro.showToast({ title: '请先选择宝宝', icon: 'none' })
@@ -73,6 +77,8 @@ export default function SleepPage() {
     } catch (error) {
       console.error('记录失败:', error)
       Taro.showToast({ title: '记录失败', icon: 'none' })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -139,7 +145,7 @@ export default function SleepPage() {
         {/* Prefill - 移到最下面 */}
         {recentRecords.length > 0 && (
           <View className='section section-vertical'>
-            <Text className='field-label'>历史预填</Text>
+            <Text className='field-label'>最近的记录</Text>
             <View className='prefill-row'>
               {recentRecords.map((r) => (
                 <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
@@ -151,7 +157,7 @@ export default function SleepPage() {
         )}
       </View>
 
-      <Button className='submit-btn' onClick={handleSubmit}>
+      <Button className='submit-btn' onClick={handleSubmit} loading={loading} disabled={loading}>
         记录
       </Button>
     </View>
