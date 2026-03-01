@@ -374,7 +374,7 @@ app.delete('/api/babies/:id', verifyToken, (req, res) => {
 
 app.get('/api/records', verifyToken, (req, res) => {
   try {
-    const { babyId, category, limit = 50 } = req.query
+    const { babyId, category, limit = 20, offset = 0 } = req.query
 
     let query = `
       SELECT r.*, bm.role as reporterRole
@@ -394,10 +394,27 @@ app.get('/api/records', verifyToken, (req, res) => {
       params.push(category)
     }
 
-    query += ' ORDER BY r.startTime DESC LIMIT ?'
+    query += ' ORDER BY r.startTime DESC LIMIT ? OFFSET ?'
     params.push(parseInt(limit))
+    params.push(parseInt(offset))
 
     const records = db.prepare(query).all(...params)
+
+    // 获取总数
+    let countQuery = 'SELECT COUNT(*) as total FROM records r WHERE 1=1'
+    const countParams = []
+    
+    if (babyId) {
+      countQuery += ' AND r.babyId = ?'
+      countParams.push(parseInt(babyId))
+    }
+    
+    if (category) {
+      countQuery += ' AND r.category = ?'
+      countParams.push(category)
+    }
+    
+    const { total } = db.prepare(countQuery).get(...countParams)
 
     res.json({
       success: true,
@@ -406,6 +423,12 @@ app.get('/api/records', verifyToken, (req, res) => {
         extra: r.extra ? JSON.parse(r.extra) : null,
         reporterRole: r.reporterRole || '家长',
       })),
+      pagination: {
+        total,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: parseInt(offset) + records.length < total,
+      },
     })
   } catch (error) {
     console.error('获取记录失败:', error)

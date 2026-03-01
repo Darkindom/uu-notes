@@ -215,17 +215,31 @@ export interface Record {
   updatedAt: number
 }
 
+export interface RecordsResponse {
+  records: Record[]
+  pagination: {
+    total: number
+    limit: number
+    offset: number
+    hasMore: boolean
+  }
+}
+
 export const getRecords = (params: {
   babyId?: number
   category?: string
   limit?: number
-}): Promise<Record[]> => {
+  offset?: number
+}): Promise<RecordsResponse> => {
   const query = Object.entries(params)
     .filter(([_, v]) => v !== undefined)
     .map(([k, v]) => `${k}=${v}`)
     .join('&')
   
-  return request<Record[]>({ url: `/records${query ? '?' + query : ''}` })
+  return request<any>({ url: `/records${query ? '?' + query : ''}` }).then(data => ({
+    records: data.data || data,
+    pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false }
+  }))
 }
 
 export const createRecord = (data: {
@@ -285,7 +299,8 @@ export const getRecentRecordsByCategory = async (
       return []
     }
     
-    return await getRecords({ babyId: baby.id, category, limit })
+    const response = await getRecords({ babyId: baby.id, category, limit, offset: 0 })
+    return response.records
   } catch (error) {
     console.error('获取最近记录失败:', error)
     return []
