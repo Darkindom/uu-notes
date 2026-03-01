@@ -119,7 +119,7 @@ export default function RecordsPage() {
                 <View className='record-body'>
                   <Text className='record-summary'>{formatRecordSummary(record)}</Text>
                   <Text className='record-time'>{formatTimestamp(record.startTime)}</Text>
-                  <Text className='record-reporter'>👤 记录人 {record.reporterId}</Text>
+                  <Text className='record-reporter'>👤 记录人 {record.reporterRole || '家长'}</Text>
                 </View>
                 <View className='delete-btn' onClick={() => handleDelete(record.id)}>
                   <Text className='delete-icon'>✕</Text>

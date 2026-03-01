@@ -148,6 +148,12 @@ export const updateUser = (data: {
 
 // ============ 宝宝相关 ============
 
+export interface BabyMember {
+  userId: number
+  nickname: string
+  role: string
+}
+
 export interface Baby {
   id: number
   name: string
@@ -156,6 +162,7 @@ export interface Baby {
   avatarUrl?: string
   creatorId: number
   memberIds: number[]
+  members?: BabyMember[]
   createdAt: number
   updatedAt: number
 }
@@ -191,6 +198,7 @@ export interface Record {
   extra?: any
   note?: string
   reporterId: number
+  reporterRole?: string
   createdAt: number
   updatedAt: number
 }

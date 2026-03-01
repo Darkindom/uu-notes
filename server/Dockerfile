@@ -2,6 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# 安装 sqlite3 命令行工具
+RUN apk add --no-cache sqlite
+
 # 安装依赖
 COPY package*.json ./
 RUN npm install --production

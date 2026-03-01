@@ -9,12 +9,12 @@ const ROLES = ['妈妈', '爸爸', '奶奶', '爷爷', '外婆', '外公', '其�
 export default function OnboardingPage() {
   const [step, setStep] = useState(1) // 1: 输入用户信息, 2: 输入宝宝信息
   const [loading, setLoading] = useState(false)
-  
+
   // 用户信息
   const [nickname, setNickname] = useState('')
   const [role, setRole] = useState('妈妈')
   const [roleIdx, setRoleIdx] = useState(0)
-  
+
   // 宝宝信息
   const [babyName, setBabyName] = useState('')
   const [gender, setGender] = useState<'male' | 'female'>('male')
@@ -34,7 +34,7 @@ export default function OnboardingPage() {
       fail: (err) => {
         console.log('获取用户信息失败', err)
         Taro.showToast({ title: '获取信息失败', icon: 'none' })
-      }
+      },
     })
   }
 
@@ -74,15 +74,15 @@ export default function OnboardingPage() {
         birthday: new Date(birthday).getTime(),
         role,
       })
-      
+
       if (!baby) {
         throw new Error('创建宝宝信息失败')
-    }
+      }
 
-    Taro.showToast({ title: '创建成功！', icon: 'success' })
-    setTimeout(() => {
-      Taro.reLaunch({ url: '/pages/index/index' })
-    }, 1500)
+      Taro.showToast({ title: '创建成功！', icon: 'success' })
+      setTimeout(() => {
+        Taro.reLaunch({ url: '/pages/index/index' })
+      }, 1500)
     } catch (error) {
       console.error('创建失败:', error)
       Taro.showToast({ title: '创建失败，请重试', icon: 'none' })
@@ -107,7 +107,7 @@ export default function OnboardingPage() {
                 className='text-input'
                 placeholder='请输入您的昵称'
                 value={nickname}
-                onInput={e => setNickname(e.detail.value)}
+                onInput={(e) => setNickname(e.detail.value)}
               />
               {!nickname && (
                 <Button className='get-info-btn' onClick={handleGetUserInfo}>
@@ -122,7 +122,7 @@ export default function OnboardingPage() {
                 mode='selector'
                 range={ROLES}
                 value={roleIdx}
-                onChange={e => {
+                onChange={(e) => {
                   const idx = parseInt(e.detail.value)
                   setRoleIdx(idx)
                   setRole(ROLES[idx])
@@ -149,7 +149,7 @@ export default function OnboardingPage() {
                 className='text-input'
                 placeholder='请输入宝宝姓名'
                 value={babyName}
-                onInput={e => setBabyName(e.detail.value)}
+                onInput={(e) => setBabyName(e.detail.value)}
               />
             </View>
 
@@ -177,11 +177,9 @@ export default function OnboardingPage() {
                 mode='date'
                 value={birthday}
                 end={new Date().toISOString().split('T')[0]}
-                onChange={e => setBirthday(e.detail.value)}
+                onChange={(e) => setBirthday(e.detail.value)}
               >
-                <View className='picker-display'>
-                  {birthday || '请选择生日'}
-                </View>
+                <View className='picker-display'>{birthday || '请选择生日'}</View>
               </Picker>
             </View>
 
@@ -189,11 +187,7 @@ export default function OnboardingPage() {
               <Button className='back-btn' onClick={() => setStep(1)}>
                 上一步
               </Button>
-              <Button
-                className='submit-btn'
-                onClick={handleSubmit}
-                loading={loading}
-              >
+              <Button className='submit-btn' onClick={handleSubmit} loading={loading}>
                 完成
               </Button>
             </View>

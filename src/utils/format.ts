@@ -33,6 +33,7 @@ export const SUBCATEGORY_LABELS: { [key: string]: string } = {
   tonic: '补剂',
   outdoor: '户外',
   cry: '哭闹',
+  gear: '护具',
 }
 
 export const CATEGORY_LABELS: { [key: string]: string } = {
@@ -90,6 +91,9 @@ export function formatRecordSummary(record: Record): string {
   }
   if (sub === 'cry') {
     return `哭闹 ${val}分钟`
+  }
+  if (sub === 'gear') {
+    return `护具 ${extra.gear_type ?? ''}`
   }
   return SUBCATEGORY_LABELS[sub] ?? sub
 }

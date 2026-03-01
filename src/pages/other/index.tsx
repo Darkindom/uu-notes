@@ -7,13 +7,16 @@ import { createRecord, getRecentRecordsByCategory, getCurrentBaby, type Record a
 import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES, formatRecordSummary } from '../../utils/format'
 import './index.less'
 
-type SubType = 'tonic' | 'outdoor' | 'cry'
+type SubType = 'tonic' | 'outdoor' | 'cry' | 'gear'
 
 const SUB_MENUS: { label: string; value: SubType }[] = [
   { label: '户外', value: 'outdoor' },
   { label: '补剂', value: 'tonic' },
   { label: '哭闹', value: 'cry' },
+  { label: '护具', value: 'gear' },
 ]
+
+const GEAR_TYPES = ['带上', '脱下']
 
 export default function OtherPage() {
   const dt = getCurrentDateTime()
@@ -21,6 +24,7 @@ export default function OtherPage() {
   const [time, setTime] = useState(dt.time)
   const [subType, setSubType] = useState<SubType>('outdoor')
   const [tonicType, setTonicType] = useState(TONIC_TYPES[0])
+  const [gearType, setGearType] = useState(GEAR_TYPES[0])
   const [duration, setDuration] = useState('')
   const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
 
@@ -56,9 +60,20 @@ export default function OtherPage() {
         setTonicType(TONIC_TYPES[0])
       }
       setDuration('')
+      setGearType(GEAR_TYPES[0])
+    } else if (sub === 'gear') {
+      try {
+        const extra = r.extra as any
+        setGearType(extra?.gear_type ?? GEAR_TYPES[0])
+      } catch {
+        setGearType(GEAR_TYPES[0])
+      }
+      setDuration('')
+      setTonicType(TONIC_TYPES[0])
     } else {
       setDuration(r.value || '')
       setTonicType(TONIC_TYPES[0])
+      setGearType(GEAR_TYPES[0])
     }
   }
 
@@ -69,6 +84,9 @@ export default function OtherPage() {
     if (subType === 'tonic') {
       value = '1'
       extra = { tonic_type: tonicType }
+    } else if (subType === 'gear') {
+      value = '1'
+      extra = { gear_type: gearType }
     } else {
       if (!duration) {
         Taro.showToast({ title: '请输入时长', icon: 'none' })
@@ -144,6 +162,24 @@ export default function OtherPage() {
                   key={t}
                   className={`option-chip ${tonicType === t ? 'active' : ''}`}
                   onClick={() => setTonicType(t)}
+                >
+                  <Text>{t}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Gear */}
+        {subType === 'gear' && (
+          <View className='section'>
+            <Text className='field-label'>类型</Text>
+            <View className='options-row'>
+              {GEAR_TYPES.map((t) => (
+                <View
+                  key={t}
+                  className={`option-chip ${gearType === t ? 'active' : ''}`}
+                  onClick={() => setGearType(t)}
                 >
                   <Text>{t}</Text>
                 </View>

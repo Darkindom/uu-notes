@@ -61,10 +61,23 @@ db.exec(`
     FOREIGN KEY (reporterId) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS baby_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    babyId INTEGER NOT NULL,
+    userId INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    FOREIGN KEY (babyId) REFERENCES babies(id) ON DELETE CASCADE,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(babyId, userId)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_users_openId ON users(openId);
   CREATE INDEX IF NOT EXISTS idx_babies_creatorId ON babies(creatorId);
   CREATE INDEX IF NOT EXISTS idx_records_babyId ON records(babyId);
   CREATE INDEX IF NOT EXISTS idx_records_startTime ON records(startTime);
+  CREATE INDEX IF NOT EXISTS idx_baby_members_babyId ON baby_members(babyId);
+  CREATE INDEX IF NOT EXISTS idx_baby_members_userId ON baby_members(userId);
 `)
 
 console.log('数据库初始化完成')
@@ -228,12 +241,32 @@ app.get('/api/babies', verifyToken, (req, res) => {
     const placeholders = babyIds.map(() => '?').join(',')
     const babies = db.prepare(`SELECT * FROM babies WHERE id IN (${placeholders})`).all(...babyIds)
 
+    // 为每个宝宝获取成员详细信息
+    const babiesWithMembers = babies.map((b) => {
+      const memberIds = b.memberIds ? JSON.parse(b.memberIds) : []
+      
+      // 获取成员详细信息
+      const members = memberIds.map((userId) => {
+        const userInfo = db.prepare('SELECT id, nickname FROM users WHERE id = ?').get(userId)
+        const memberRelation = db.prepare('SELECT role FROM baby_members WHERE babyId = ? AND userId = ?').get(b.id, userId)
+        
+        return {
+          userId,
+          nickname: userInfo?.nickname || '未命名',
+          role: memberRelation?.role || '成员',
+        }
+      })
+
+      return {
+        ...b,
+        memberIds,
+        members,
+      }
+    })
+
     res.json({
       success: true,
-      data: babies.map((b) => ({
-        ...b,
-        memberIds: b.memberIds ? JSON.parse(b.memberIds) : [],
-      })),
+      data: babiesWithMembers,
     })
   } catch (error) {
     console.error('获取宝宝列表失败:', error)
@@ -246,7 +279,7 @@ app.post('/api/babies', verifyToken, (req, res) => {
     const { name, gender, birthday, avatarUrl, role } = req.body
     const now = Date.now()
 
-    // 创建宝宝
+    // 创建宝宝，将创建者添加到成员列表
     const result = db
       .prepare(
         `
@@ -254,9 +287,17 @@ app.post('/api/babies', verifyToken, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
-      .run(name, gender, birthday, avatarUrl, req.userId, JSON.stringify([]), now, now)
+      .run(name, gender, birthday, avatarUrl, req.userId, JSON.stringify([req.userId]), now, now)
 
     const babyId = result.lastInsertRowid
+
+    // 添加成员关系记录（保存角色信息）
+    db.prepare(
+      `
+      INSERT INTO baby_members (babyId, userId, role, createdAt)
+      VALUES (?, ?, ?, ?)
+    `,
+    ).run(babyId, req.userId, role || '家长', now)
 
     // 更新用户的宝宝列表
     const user = db.prepare('SELECT babyIds, currentBabyId FROM users WHERE id = ?').get(req.userId)
@@ -280,7 +321,7 @@ app.post('/api/babies', verifyToken, (req, res) => {
         birthday,
         avatarUrl,
         creatorId: req.userId,
-        memberIds: [],
+        memberIds: [req.userId],
         createdAt: now,
         updatedAt: now,
       },
@@ -335,20 +376,25 @@ app.get('/api/records', verifyToken, (req, res) => {
   try {
     const { babyId, category, limit = 50 } = req.query
 
-    let query = 'SELECT * FROM records WHERE 1=1'
+    let query = `
+      SELECT r.*, bm.role as reporterRole
+      FROM records r
+      LEFT JOIN baby_members bm ON r.babyId = bm.babyId AND r.reporterId = bm.userId
+      WHERE 1=1
+    `
     const params = []
 
     if (babyId) {
-      query += ' AND babyId = ?'
+      query += ' AND r.babyId = ?'
       params.push(parseInt(babyId))
     }
 
     if (category) {
-      query += ' AND category = ?'
+      query += ' AND r.category = ?'
       params.push(category)
     }
 
-    query += ' ORDER BY startTime DESC LIMIT ?'
+    query += ' ORDER BY r.startTime DESC LIMIT ?'
     params.push(parseInt(limit))
 
     const records = db.prepare(query).all(...params)
@@ -358,6 +404,7 @@ app.get('/api/records', verifyToken, (req, res) => {
       data: records.map((r) => ({
         ...r,
         extra: r.extra ? JSON.parse(r.extra) : null,
+        reporterRole: r.reporterRole || '家长',
       })),
     })
   } catch (error) {

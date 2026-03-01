@@ -20,7 +20,7 @@ export default function BabySelectorPage() {
     if (!selectedBaby) {
       return {
         title: '宝宝成长记录',
-        path: '/pages/index/index'
+        path: '/pages/index/index',
       }
     }
     return {
@@ -206,13 +206,13 @@ export default function BabySelectorPage() {
               </View>
             </View>
             <View className='members-list'>
-              {selectedBaby.memberIds && selectedBaby.memberIds.length > 0 ? (
-                selectedBaby.memberIds.map((_, index) => (
-                  <View key={index} className='member-item'>
+              {selectedBaby.members && selectedBaby.members.length > 0 ? (
+                selectedBaby.members.map((member) => (
+                  <View key={member.userId} className='member-item'>
                     <View className='member-icon'>👤</View>
                     <View className='member-info'>
-                      <Text className='member-name'>成员 {index + 1}</Text>
-                      <Text className='member-role'>成员</Text>
+                      <Text className='member-name'>{member.nickname}</Text>
+                      <Text className='member-role'>{member.role}</Text>
                     </View>
                   </View>
                 ))
@@ -223,10 +223,7 @@ export default function BabySelectorPage() {
               )}
             </View>
             <View className='modal-footer'>
-              <Button 
-                className='invite-btn' 
-                openType='share'
-              >
+              <Button className='invite-btn' openType='share'>
                 邀请成员
               </Button>
             </View>

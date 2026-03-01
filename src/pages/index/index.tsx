@@ -2,7 +2,7 @@ import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { getCurrentBaby, checkLogin } from '../../utils/api'
-import { getIndexCache, setIndexCache } from '../../utils/cache'
+import { getIndexCache, setIndexCache, clearIndexCache } from '../../utils/cache'
 import './index.less'
 
 const MENU_ITEMS = [
@@ -11,8 +11,6 @@ const MENU_ITEMS = [
   { label: '拉', emoji: '🚽', path: '/pages/shit/index', color: '#8B6E5B', bg: '#F5EDE8' },
   { label: '其他', emoji: '✨', path: '/pages/other/index', color: '#4CAF7D', bg: '#EDFBF3' },
 ]
-
-const CACHE_DURATION = 5 * 60 * 1000 // 5分钟缓存
 
 export default function Index() {
   const [babyName, setBabyName] = useState(() => {
@@ -23,23 +21,19 @@ export default function Index() {
   const [loading, setLoading] = useState(true)
 
   useDidShow(async () => {
-    // 检查缓存是否有效
+    // 先从缓存读取快速显示
     const cache = getIndexCache()
-    const now = Date.now()
-    
-    if (cache && (now - cache.timestamp < CACHE_DURATION)) {
-      // 缓存有效，直接使用
+    if (cache && cache.name) {
       setBabyName(cache.name)
       setLoading(false)
-      return
     }
 
-    // 缓存无效或不存在，重新加载
-    setLoading(true)
+    // 异步请求接口，验证并更新数据
     try {
       // 检查是否已登录
       const isLoggedIn = await checkLogin()
       if (!isLoggedIn) {
+        clearIndexCache()
         Taro.redirectTo({ url: '/pages/onboarding/index' })
         return
       }
@@ -47,18 +41,25 @@ export default function Index() {
       // 已登录，检查是否有当前宝宝
       const baby = await getCurrentBaby()
       if (!baby) {
-        // 有用户但没有宝宝，跳转到添加宝宝页面
+        // 有用户但没有宝宝，清除缓存并跳转到添加宝宝页面
+        clearIndexCache()
         Taro.redirectTo({ url: '/pages/onboarding/index?step=2' })
         return
       }
 
-      setBabyName(baby.name)
-      
-      // 更新缓存
+      // 数据有效，更新缓存（下次进入会使用新数据）
       setIndexCache(baby.name)
+      
+      // 如果接口返回的数据与当前显示不一致，更新显示
+      if (baby.name !== babyName) {
+        setBabyName(baby.name)
+      }
     } catch (error) {
       console.error('加载数据失败:', error)
-      Taro.showToast({ title: '加载失败', icon: 'none' })
+      // 如果没有缓存数据，才显示错误提示
+      if (!cache || !cache.name) {
+        Taro.showToast({ title: '加载失败', icon: 'none' })
+      }
     } finally {
       setLoading(false)
     }
@@ -68,11 +69,9 @@ export default function Index() {
     <View className='index-page'>
       <View className='content'>
         <View className='title-section'>
-          <Text className='baby-title'>
-            {loading ? '加载中' : `${babyName} 的日常`}
-          </Text>
+          <Text className='baby-title'>{loading ? '加载中' : `${babyName} 的日常`}</Text>
         </View>
-        
+
         <View className='grid'>
           {MENU_ITEMS.map((item) => (
             <View
