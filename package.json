@@ -2,7 +2,7 @@
   "name": "uu-notes",
   "version": "1.0.0",
   "private": true,
-  "description": "猪宝日常记录小程序",
+  "description": "UU日记小程序",
   "templateInfo": {
     "name": "default",
     "typescript": true,

@@ -1,72 +1,27 @@
-.index-page {
-  min-height: 100vh;
-  background: #fff8f0;
+.prelanding-page {
+  height: 100vh;
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 20px;
-  box-sizing: border-box;
+  align-items: center;
+  background: #f8f9fa;
 }
 
 .loading-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  font-size: 40px;
-  color: #666;
-}
-
-.content {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 40px;
-}
-
-.title-section {
   text-align: center;
-  padding: 20px 0;
 }
 
-.baby-title {
-  font-size: 64px;
-  font-weight: 900;
-  color: #111;
-  display: block;
+.loading-text {
+  font-size: 48px;
+  font-weight: 600;
+  color: #333;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  width: 100%;
-}
-
-.menu-btn {
-  border-radius: 32px;
-  border: 4px solid transparent;
-  padding: 60px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s;
-
-  &:active {
-    opacity: 0.8;
-    transform: scale(0.96);
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
   }
-}
-
-.menu-emoji {
-  font-size: 80px;
-  margin-bottom: 16px;
-}
-
-.menu-label {
-  font-size: 108px;
-  font-weight: 900;
-  letter-spacing: 4px;
+  50% {
+    opacity: 0.5;
+  }
 }

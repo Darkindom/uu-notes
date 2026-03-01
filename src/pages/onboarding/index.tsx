@@ -21,7 +21,7 @@ export default function OnboardingPage() {
   const [birthday, setBirthday] = useState('')
 
   useLoad(() => {
-    // 不在这里自动获取用户信息，改为用户点击按钮后获取
+    // onboarding 页面不需要再做检查，由 prelanding 统一处理
   })
 
   function handleGetUserInfo() {
@@ -81,7 +81,7 @@ export default function OnboardingPage() {
 
       Taro.showToast({ title: '创建成功！', icon: 'success' })
       setTimeout(() => {
-        Taro.reLaunch({ url: '/pages/index/index' })
+        Taro.switchTab({ url: '/pages/home/index' })
       }, 1500)
     } catch (error) {
       console.error('创建失败:', error)
@@ -123,7 +123,7 @@ export default function OnboardingPage() {
                 range={ROLES}
                 value={roleIdx}
                 onChange={(e) => {
-                  const idx = parseInt(e.detail.value)
+                  const idx = parseInt(String(e.detail.value))
                   setRoleIdx(idx)
                   setRole(ROLES[idx])
                 }}

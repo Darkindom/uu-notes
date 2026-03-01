@@ -1,7 +1,7 @@
 export default defineAppConfig({
-  cloud: true,
   pages: [
     'pages/index/index',
+    'pages/home/index',
     'pages/baby-selector/index',
     'pages/records/index',
     'pages/onboarding/index',
@@ -25,7 +25,7 @@ export default defineAppConfig({
     borderStyle: 'white',
     list: [
       {
-        pagePath: 'pages/index/index',
+        pagePath: 'pages/home/index',
         text: '首页',
       },
       {

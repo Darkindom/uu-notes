@@ -47,12 +47,12 @@ export default function BabySelectorPage() {
     if (!selectedBaby) {
       return {
         title: '宝宝成长记录',
-        path: '/pages/index/index',
+        path: '/pages/home/index',
       }
     }
     return {
       title: `邀请你加入「${selectedBaby.name}」的成长记录`,
-      path: `/pages/index/index?babyId=${selectedBaby.id}&inviteFrom=share`,
+      path: `/pages/home/index?babyId=${selectedBaby.id}&inviteFrom=share`,
     }
   })
 
@@ -190,7 +190,7 @@ export default function BabySelectorPage() {
       await loadBabies()
       // 切换到首页
       setTimeout(() => {
-        Taro.switchTab({ url: '/pages/index/index' })
+        Taro.switchTab({ url: '/pages/home/index' })
       }, 500)
     } catch (error) {
       console.error('切换失败:', error)
@@ -227,7 +227,7 @@ export default function BabySelectorPage() {
       // 如果删除的是当前选中的宝宝，重新加载页面
       if (babyId === currentBabyId) {
         setTimeout(() => {
-          Taro.reLaunch({ url: '/pages/index/index' })
+          Taro.switchTab({ url: '/pages/home/index' })
         }, 500)
       }
     } catch (error: any) {

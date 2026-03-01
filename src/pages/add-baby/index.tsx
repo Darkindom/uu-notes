@@ -49,7 +49,7 @@ export default function AddBabyPage() {
       clearIndexCache()
       Taro.showToast({ title: '添加成功！', icon: 'success' })
       setTimeout(() => {
-        Taro.reLaunch({ url: '/pages/index/index' })
+        Taro.switchTab({ url: '/pages/home/index' })
       }, 1500)
     } catch (error) {
       console.error('添加失败:', error)
