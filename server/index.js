@@ -17,14 +17,89 @@ const cache = new NodeCache({
   useClones: false    // 不克隆对象，提高性能
 })
 
-// 确保数据目录存在
+// 确保日志目录存在
+const logsDir = path.join(__dirname, 'logs')
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true })
+}
+
+// 日志工具函数
+function log(level, message, data = null) {
+  const timestamp = new Date().toISOString()
+  const logMessage = data 
+    ? `[${timestamp}] [${level}] ${message} ${JSON.stringify(data)}`
+    : `[${timestamp}] [${level}] ${message}`
+  
+  // 输出到控制台
+  console.log(logMessage)
+  
+  // 写入日志文件
+  const logFile = path.join(logsDir, `${new Date().toISOString().split('T')[0]}.log`)
+  fs.appendFileSync(logFile, logMessage + '\n')
+}
+
+// 确保数据目录和备份目录存在
 const dataDir = path.dirname(process.env.DB_PATH || './data/uu-notes.db')
+const backupDir = path.join(dataDir, 'backups')
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true })
 }
+if (!fs.existsSync(backupDir)) {
+  fs.mkdirSync(backupDir, { recursive: true })
+}
+
+// 数据库备份函数
+function backupDatabase() {
+  try {
+    const dbPath = process.env.DB_PATH || './data/uu-notes.db'
+    if (!fs.existsSync(dbPath)) {
+      log('WARN', '数据库文件不存在，跳过备份')
+      return
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]
+    const backupPath = path.join(backupDir, `backup-${timestamp}.db`)
+    
+    // 如果今天已经备份过，跳过
+    if (fs.existsSync(backupPath)) {
+      log('INFO', '今天已备份，跳过')
+      return
+    }
+
+    // 复制数据库文件
+    fs.copyFileSync(dbPath, backupPath)
+    log('INFO', `数据库备份成功: ${backupPath}`)
+
+    // 清理7天前的备份
+    const files = fs.readdirSync(backupDir)
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    files.forEach(file => {
+      const filePath = path.join(backupDir, file)
+      const stats = fs.statSync(filePath)
+      if (stats.mtimeMs < sevenDaysAgo) {
+        fs.unlinkSync(filePath)
+        log('INFO', `删除旧备份: ${file}`)
+      }
+    })
+  } catch (error) {
+    log('ERROR', '数据库备份失败', { error: error.message })
+  }
+}
+
+// 每天凌晨3点备份数据库
+setInterval(() => {
+  const now = new Date()
+  if (now.getHours() === 3 && now.getMinutes() === 0) {
+    backupDatabase()
+  }
+}, 60 * 1000) // 每分钟检查一次
+
+// 启动时立即备份一次
+backupDatabase()
 
 // 初始化数据库
 const db = new Database(process.env.DB_PATH || './data/uu-notes.db')
+log('INFO', '数据库初始化完成')
 
 // 创建表
 db.exec(`
@@ -88,8 +163,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_baby_members_userId ON baby_members(userId);
 `)
 
-console.log('数据库初始化完成')
-
 // 缓存辅助函数
 function generateCacheKey(prefix, params) {
   return `${prefix}:${JSON.stringify(params)}`
@@ -103,7 +176,7 @@ function clearRecordsCacheForBaby(babyId) {
       cache.del(key)
     }
   })
-  console.log(`已清除宝宝 ${babyId} 的相关记录缓存`)
+  log('INFO', `清除宝宝 ${babyId} 的记录缓存`)
 }
 
 // 中间件
@@ -114,6 +187,24 @@ app.use(
   }),
 )
 app.use(express.json())
+
+// 请求日志中间件
+app.use((req, res, next) => {
+  const startTime = Date.now()
+  
+  // 记录响应
+  const originalSend = res.send
+  res.send = function(data) {
+    const duration = Date.now() - startTime
+    log('API', `${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`, {
+      query: req.query,
+      body: req.method !== 'GET' ? req.body : undefined,
+    })
+    return originalSend.call(this, data)
+  }
+  
+  next()
+})
 
 // JWT 验证中间件
 const verifyToken = (req, res, next) => {
@@ -147,8 +238,7 @@ app.post('/api/auth/login', async (req, res) => {
       console.log('🔧 开发模式：使用测试 openId')
       openId = process.env.DEV_OPENID
     } else if (!process.env.WECHAT_APPID) {
-      // 没有配置微信 APPID，但也没有测试 openId
-      console.error('开发环境需要配置 DEV_OPENID')
+      log('ERROR', '开发环境缺少配置 DEV_OPENID')
       return res.status(500).json({ error: '服务器配置错误' })
     } else {
       // 生产环境：调用微信 API 获取 openId
@@ -156,7 +246,7 @@ app.post('/api/auth/login', async (req, res) => {
       const SECRET = process.env.WECHAT_SECRET
 
       if (!APPID || !SECRET) {
-        console.error('缺少微信配置: WECHAT_APPID 或 WECHAT_SECRET')
+        log('ERROR', '缺少微信配置: WECHAT_APPID 或 WECHAT_SECRET')
         return res.status(500).json({ error: '服务器配置错误' })
       }
 
@@ -166,7 +256,7 @@ app.post('/api/auth/login', async (req, res) => {
       const wxData = await wxRes.json()
 
       if (wxData.errcode) {
-        console.error('微信登录失败:', wxData)
+        log('ERROR', '微信登录失败', { errcode: wxData.errcode, errmsg: wxData.errmsg })
         return res.status(400).json({ error: wxData.errmsg || '微信登录失败' })
       }
 
@@ -217,7 +307,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json(responseData)
   } catch (error) {
-    console.error('登录失败:', error)
+    log('ERROR', '登录失败', { error: error.message })
     res.status(500).json({ error: '登录失败' })
   }
 })
@@ -240,7 +330,7 @@ app.get('/api/user/current', verifyToken, (req, res) => {
       },
     })
   } catch (error) {
-    console.error('获取用户信息失败:', error)
+    log('ERROR', '获取用户信息失败', { error: error.message, userId: req.userId })
     res.status(500).json({ error: '获取用户信息失败' })
   }
 })
@@ -260,7 +350,7 @@ app.put('/api/user/current', verifyToken, (req, res) => {
 
     res.json({ success: true })
   } catch (error) {
-    console.error('更新用户信息失败:', error)
+    log('ERROR', '更新用户信息失败', { error: error.message, userId: req.userId })
     res.status(500).json({ error: '更新用户信息失败' })
   }
 })
@@ -275,7 +365,7 @@ app.get('/api/babies', verifyToken, (req, res) => {
     // 尝试从缓存获取
     const cachedData = cache.get(cacheKey)
     if (cachedData) {
-      console.log('✅ 从缓存返回宝宝列表', cacheKey)
+      log('CACHE', '命中缓存 - 宝宝列表', { cacheKey })
       return res.json(cachedData)
     }
 
@@ -327,11 +417,11 @@ app.get('/api/babies', verifyToken, (req, res) => {
 
     // 存入缓存
     cache.set(cacheKey, responseData)
-    console.log('💾 缓存宝宝列表', cacheKey)
+    log('CACHE', '存入缓存 - 宝宝列表', { cacheKey })
 
     res.json(responseData)
   } catch (error) {
-    console.error('获取宝宝列表失败:', error)
+    log('ERROR', '获取宝宝列表失败', { error: error.message })
     res.status(500).json({ error: '获取宝宝列表失败' })
   }
 })
@@ -393,7 +483,7 @@ app.post('/api/babies', verifyToken, (req, res) => {
     const userCacheKey = generateCacheKey('babies', { userId: req.userId })
     cache.del(userCacheKey)
   } catch (error) {
-    console.error('创建宝宝失败:', error)
+    log('ERROR', '创建宝宝失败', { error: error.message, userId: req.userId })
     res.status(500).json({ error: '创建宝宝失败' })
   }
 })
@@ -428,7 +518,7 @@ app.put('/api/babies/:id', verifyToken, (req, res) => {
     const userCacheKey = generateCacheKey('babies', { userId: req.userId })
     cache.del(userCacheKey)
   } catch (error) {
-    console.error('更新宝宝信息失败:', error)
+    log('ERROR', '更新宝宝信息失败', { error: error.message, babyId: req.params.id })
     res.status(500).json({ error: '更新宝宝信息失败' })
   }
 })
@@ -474,7 +564,7 @@ app.delete('/api/babies/:id', verifyToken, (req, res) => {
     cache.del(userCacheKey)
     clearRecordsCacheForBaby(babyId)
   } catch (error) {
-    console.error('删除宝宝失败:', error)
+    log('ERROR', '删除宝宝失败', { error: error.message, babyId: req.params.id })
     res.status(500).json({ error: '删除宝宝失败' })
   }
 })
@@ -491,7 +581,7 @@ app.get('/api/records/:id', verifyToken, (req, res) => {
     // 尝试从缓存获取
     const cachedData = cache.get(cacheKey)
     if (cachedData) {
-      console.log('✅ 从缓存返回记录详情', cacheKey)
+      log('CACHE', '命中缓存 - 记录详情', { cacheKey })
       return res.json(cachedData)
     }
 
@@ -518,11 +608,11 @@ app.get('/api/records/:id', verifyToken, (req, res) => {
 
     // 存入缓存
     cache.set(cacheKey, responseData)
-    console.log('💾 缓存记录详情', cacheKey)
+    log('CACHE', '存入缓存 - 记录详情', { cacheKey })
 
     res.json(responseData)
   } catch (error) {
-    console.error('获取记录详情失败:', error)
+    log('ERROR', '获取记录详情失败', { error: error.message, recordId: req.params.id })
     res.status(500).json({ error: '获取记录详情失败' })
   }
 })
@@ -544,7 +634,7 @@ app.get('/api/records', verifyToken, (req, res) => {
     // 尝试从缓存获取
     const cachedData = cache.get(cacheKey)
     if (cachedData) {
-      console.log('✅ 从缓存返回记录数据', cacheKey)
+      log('CACHE', '命中缓存 - 记录列表', { cacheKey })
       return res.json(cachedData)
     }
 
@@ -627,18 +717,18 @@ app.get('/api/records', verifyToken, (req, res) => {
 
     // 存入缓存
     cache.set(cacheKey, responseData)
-    console.log('💾 缓存记录数据', cacheKey)
+    log('CACHE', '存入缓存 - 记录列表', { cacheKey })
 
     res.json(responseData)
   } catch (error) {
-    console.error('获取记录失败:', error)
+    log('ERROR', '获取记录失败', { error: error.message, query: req.query })
     res.status(500).json({ error: '获取记录失败' })
   }
 })
 
 app.post('/api/records', verifyToken, (req, res) => {
+  const { babyId, category, subCategory, startTime, endTime, value, extra, note } = req.body
   try {
-    const { babyId, category, subCategory, startTime, endTime, value, extra, note } = req.body
     const now = Date.now()
 
     const result = db
@@ -683,7 +773,7 @@ app.post('/api/records', verifyToken, (req, res) => {
     // 清除相关缓存
     clearRecordsCacheForBaby(babyId)
   } catch (error) {
-    console.error('创建记录失败:', error)
+    log('ERROR', '创建记录失败', { error: error.message, babyId })
     res.status(500).json({ error: '创建记录失败' })
   }
 })
@@ -724,7 +814,7 @@ app.put('/api/records/:id', verifyToken, (req, res) => {
     // 清除相关缓存
     clearRecordsCacheForBaby(record.babyId)
   } catch (error) {
-    console.error('更新记录失败:', error)
+    log('ERROR', '更新记录失败', { error: error.message, recordId: req.params.id })
     res.status(500).json({ error: '更新记录失败' })
   }
 })
@@ -747,7 +837,7 @@ app.delete('/api/records/:id', verifyToken, (req, res) => {
     // 清除相关缓存
     clearRecordsCacheForBaby(record.babyId)
   } catch (error) {
-    console.error('删除记录失败:', error)
+    log('ERROR', '删除记录失败', { error: error.message, recordId: req.params.id })
     res.status(500).json({ error: '删除记录失败' })
   }
 })
@@ -760,12 +850,15 @@ app.get('/health', (req, res) => {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`🚀 服务器运行在 http://localhost:${PORT}`)
-  console.log(`📦 数据库: ${process.env.DB_PATH}`)
+  log('INFO', `服务器启动成功 http://localhost:${PORT}`)
+  log('INFO', `数据库: ${process.env.DB_PATH}`)
+  log('INFO', `日志目录: ${logsDir}`)
+  log('INFO', `备份目录: ${backupDir}`)
 })
 
 // 优雅关闭
 process.on('SIGINT', () => {
+  log('INFO', '服务器正在关闭...')
   db.close()
   process.exit(0)
 })

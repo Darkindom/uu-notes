@@ -10,6 +10,8 @@ services:
     volumes:
       # 持久化数据库
       - ./data:/app/data
+      # 持久化日志
+      - ./logs:/app/logs
     env_file:
       - .env
     environment:

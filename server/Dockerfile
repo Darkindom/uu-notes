@@ -2,8 +2,12 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# 安装 sqlite3 命令行工具
-RUN apk add --no-cache sqlite
+# 安装构建工具和 sqlite
+RUN apk add --no-cache \
+    sqlite \
+    python3 \
+    make \
+    g++
 
 # 安装依赖
 COPY package*.json ./
