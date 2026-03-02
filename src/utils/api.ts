@@ -1,13 +1,14 @@
 import Taro from '@tarojs/taro'
 
 // 环境配置
-const ENV = process.env.TARO_APP_ENV || 'prod'  // 默认使用生产环境
+const ENV = process.env.TARO_APP_ENV || 'prod' // 默认使用生产环境
 
 // API 配置 - 根据环境选择不同的 API 地址
 const API_CONFIG = {
-  dev: 'http://localhost:1717/api',     // 开发环境（本地服务器）
-  test: 'https://dksiuu.top/api',       // 测试环境
-  prod: 'https://dksiuu.top/api',       // 生产环境（正式发布使用）
+  dev: 'http://localhost:1717/api', // 开发环境（本地服务器）
+  // dev: 'https://dksiuu.top/api', // 开发环境（本地服务器）
+  test: 'https://dksiuu.top/api', // 测试环境
+  prod: 'https://dksiuu.top/api', // 生产环境（正式发布使用）
 }
 
 const API_BASE = API_CONFIG[ENV]
@@ -72,14 +73,14 @@ const request = async <T>(options: {
     }
   } catch (error: any) {
     console.error('API 请求失败:', error)
-    
+
     // 网络错误处理
     if (error.errMsg && error.errMsg.includes('timeout')) {
       Taro.showToast({ title: '网络超时', icon: 'none' })
     } else if (error.errMsg && error.errMsg.includes('fail')) {
       Taro.showToast({ title: '网络连接失败', icon: 'none' })
     }
-    
+
     throw error
   }
 }
@@ -93,11 +94,11 @@ export const login = async (): Promise<any> => {
   try {
     // 获取微信登录凭证
     const { code } = await Taro.login()
-    
+
     if (!code) {
       throw new Error('获取登录凭证失败')
     }
-    
+
     // 调用后端接口
     const data = await request<{ token: string; user: any }>({
       url: '/auth/login',
@@ -105,10 +106,10 @@ export const login = async (): Promise<any> => {
       data: { code },
       needAuth: false,
     })
-    
+
     // 保存 token
     setToken(data.token)
-    
+
     return data.user
   } catch (error) {
     console.error('登录失败:', error)
@@ -124,7 +125,7 @@ export const checkLogin = async (): Promise<boolean> => {
   if (!token) {
     return false
   }
-  
+
   try {
     await getCurrentUser()
     return true
@@ -193,12 +194,15 @@ export const createBaby = (data: {
   return request<Baby>({ url: '/babies', method: 'POST', data })
 }
 
-export const updateBaby = (id: number, data: {
-  name: string
-  gender: string
-  birthday: number
-  avatarUrl?: string
-}): Promise<void> => {
+export const updateBaby = (
+  id: number,
+  data: {
+    name: string
+    gender: string
+    birthday: number
+    avatarUrl?: string
+  },
+): Promise<void> => {
   return request({ url: `/babies/${id}`, method: 'PUT', data })
 }
 
@@ -239,17 +243,17 @@ export const getRecords = (params: {
   category?: string
   limit?: number
   offset?: number
-  startDate?: number  // 开始时间戳
-  endDate?: number    // 结束时间戳
+  startDate?: number // 开始时间戳
+  endDate?: number // 结束时间戳
 }): Promise<RecordsResponse> => {
   const query = Object.entries(params)
     .filter(([_, v]) => v !== undefined)
     .map(([k, v]) => `${k}=${v}`)
     .join('&')
-  
-  return request<any>({ url: `/records${query ? '?' + query : ''}` }).then(data => ({
+
+  return request<any>({ url: `/records${query ? '?' + query : ''}` }).then((data) => ({
     records: data.data || data,
-    pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false }
+    pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false },
   }))
 }
 
@@ -270,15 +274,18 @@ export const createRecord = (data: {
   return request<Record>({ url: '/records', method: 'POST', data })
 }
 
-export const updateRecord = (id: number, data: {
-  category: string
-  subCategory?: string
-  startTime: number
-  endTime?: number
-  value?: string
-  extra?: any
-  note?: string
-}): Promise<void> => {
+export const updateRecord = (
+  id: number,
+  data: {
+    category: string
+    subCategory?: string
+    startTime: number
+    endTime?: number
+    value?: string
+    extra?: any
+    note?: string
+  },
+): Promise<void> => {
   return request({ url: `/records/${id}`, method: 'PUT', data })
 }
 
@@ -297,9 +304,9 @@ export const getCurrentBaby = async (): Promise<Baby | null> => {
     if (!user.currentBabyId) {
       return null
     }
-    
+
     const babies = await getBabies()
-    return babies.find(b => b.id === user.currentBabyId) || null
+    return babies.find((b) => b.id === user.currentBabyId) || null
   } catch (error) {
     console.error('获取当前宝宝失败:', error)
     return null
@@ -318,14 +325,14 @@ export const switchBaby = async (babyId: number): Promise<void> => {
  */
 export const getRecentRecordsByCategory = async (
   category: string,
-  limit: number = 5
+  limit: number = 5,
 ): Promise<Record[]> => {
   try {
     const baby = await getCurrentBaby()
     if (!baby) {
       return []
     }
-    
+
     const response = await getRecords({ babyId: baby.id, category, limit, offset: 0 })
     return response.records
   } catch (error) {

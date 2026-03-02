@@ -249,12 +249,18 @@ export default function BabySelectorPage() {
         })
       }
 
-      // 如果有未脱下的，计算到当前时间
+      // 如果有未脱下的，计算到当天结束或当前时间
       if (lastOnTime !== null) {
-        totalGearMinutes += (Date.now() - lastOnTime) / (1000 * 60)
+        // 如果查看的是今天，计算到现在；否则计算到当天结束
+        const isToday = dayjs(date).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD')
+        const endTime = isToday ? Date.now() : endOfDay.getTime()
+        totalGearMinutes += (endTime - lastOnTime) / (1000 * 60)
       } else if (yesterdayLastGearOn && filteredGearEvents.length === 0) {
         // 昨天带上了，今天没有任何护具记录，说明一直戴着
-        totalGearMinutes += (Date.now() - startOfDay.getTime()) / (1000 * 60)
+        // 如果查看的是今天，计算到现在；否则计算到当天结束
+        const isToday = dayjs(date).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD')
+        const endTime = isToday ? Date.now() : endOfDay.getTime()
+        totalGearMinutes += (endTime - startOfDay.getTime()) / (1000 * 60)
       }
 
       stats.gearHours = Math.round((totalGearMinutes / 60) * 10) / 10 // 保留1位小数

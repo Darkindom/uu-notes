@@ -1,15 +1,14 @@
-import { View, Text, ScrollView, Picker } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { useState } from 'react'
-// 已迁移到自建后端 API
+import { useState, useEffect } from 'react'
+import dayjs from 'dayjs'
 import { getRecords, deleteRecord, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
-// import { getAllRecords, deleteRecord } from '../../utils/db' // 云开发已废弃
-// import type { Record } from '../../utils/db' // 云开发已废弃
 import {
   formatTimestamp,
   formatRecordSummary,
   CATEGORY_LABELS,
 } from '../../utils/format'
+import Calendar from '../../components/Calendar'
 import './index.less'
 
 const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
@@ -83,18 +82,24 @@ function groupByDate(records: ApiRecord[]) {
 }
 
 export default function RecordsPage() {
-  const [allRecords, setAllRecords] = useState<ApiRecord[]>([]) // 所有记录
+  const [allRecords, setAllRecords] = useState<ApiRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   })
+  const [showCalendar, setShowCalendar] = useState(false)
 
   // 初始加载
   useDidShow(async () => {
     await loadRecords()
   })
+
+  // 当 selectedDate 改变时，重新加载记录
+  useEffect(() => {
+    loadRecords()
+  }, [selectedDate])
 
   async function loadRecords() {
     setLoading(true)
@@ -112,7 +117,6 @@ export default function RecordsPage() {
       endOfDay.setHours(23, 59, 59, 999)
 
       // 先尝试从缓存加载
-      const cacheKey = `${baby.id}_${selectedDate}`
       const cachedRecords = loadCache(baby.id, '', selectedDate)
       if (cachedRecords) {
         setAllRecords(cachedRecords)
@@ -167,7 +171,6 @@ export default function RecordsPage() {
   }
 
   function handleEdit(record: ApiRecord) {
-    // 根据类型跳转到对应的编辑页面，通过 URL 参数传递记录数据
     const pathMap = {
       food: '/pages/food/index',
       sleep: '/pages/sleep/index',
@@ -176,11 +179,27 @@ export default function RecordsPage() {
     }
     
     const path = pathMap[record.category] || '/pages/home/index'
-    // 将记录数据存储到全局变量或缓存中
     Taro.setStorageSync('editRecord', record)
     Taro.navigateTo({
       url: `${path}?editId=${record.id}`,
     })
+  }
+
+  // 打开日历
+  function handleOpenCalendar() {
+    setShowCalendar(true)
+  }
+
+  // 确认选择日期
+  function handleConfirmDate(date: Date) {
+    const dateStr = dayjs(date).format('YYYY-MM-DD')
+    setSelectedDate(dateStr)
+    setShowCalendar(false)
+  }
+
+  // 取消选择日期
+  function handleCancelCalendar() {
+    setShowCalendar(false)
   }
 
   // 前端筛选：根据类型过滤记录
@@ -196,19 +215,9 @@ export default function RecordsPage() {
       <View className='filter-bar'>
         <View className='filter-section'>
           <Text className='filter-label'>日期</Text>
-          <Picker
-            mode='date'
-            value={selectedDate}
-            onChange={e => {
-              setSelectedDate(e.detail.value)
-              // 延迟加载，等待状态更新
-              setTimeout(() => loadRecords(), 50)
-            }}
-          >
-            <View className='date-picker-btn'>
-              <Text>{selectedDate}</Text>
-            </View>
-          </Picker>
+          <View className='date-picker-btn' onClick={handleOpenCalendar}>
+            <Text>{selectedDate}</Text>
+          </View>
         </View>
 
         <View className='filter-section'>
@@ -278,6 +287,17 @@ export default function RecordsPage() {
           </>
         )}
       </ScrollView>
+
+      {/* 日历组件 */}
+      {showCalendar && (
+        <Calendar
+          visible={showCalendar}
+          value={dayjs(selectedDate).toDate()}
+          maxDate={new Date()}
+          onConfirm={handleConfirmDate}
+          onCancel={handleCancelCalendar}
+        />
+      )}
     </View>
   )
 }
