@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from '@tarojs/components'
+import { View, Text, ScrollView, Picker } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 // 已迁移到自建后端 API
@@ -19,6 +19,52 @@ const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
   other: { bg: '#EDFBF3', color: '#4CAF7D' },
 }
 
+const CATEGORY_FILTERS = [
+  { label: '全部', value: '' },
+  { label: '吃', value: 'food' },
+  { label: '睡', value: 'sleep' },
+  { label: '拉', value: 'shit' },
+  { label: '其他', value: 'other' },
+]
+
+// 缓存键前缀
+const CACHE_KEY_PREFIX = 'records_cache_'
+
+// 获取缓存键
+function getCacheKey(babyId: number, category: string, date: string) {
+  return `${CACHE_KEY_PREFIX}${babyId}_${category}_${date}`
+}
+
+// 保存缓存
+function saveCache(babyId: number, category: string, date: string, records: ApiRecord[]) {
+  const key = getCacheKey(babyId, category, date)
+  try {
+    Taro.setStorageSync(key, {
+      records,
+      timestamp: Date.now(),
+    })
+  } catch (error) {
+    console.error('保存缓存失败:', error)
+  }
+}
+
+// 读取缓存
+function loadCache(babyId: number, category: string, date: string): ApiRecord[] | null {
+  const key = getCacheKey(babyId, category, date)
+  try {
+    const cache = Taro.getStorageSync(key)
+    if (cache && cache.records) {
+      // 缓存有效期 5 分钟
+      if (Date.now() - cache.timestamp < 5 * 60 * 1000) {
+        return cache.records
+      }
+    }
+  } catch (error) {
+    console.error('读取缓存失败:', error)
+  }
+  return null
+}
+
 function groupByDate(records: ApiRecord[]) {
   const groups: { date: string; records: ApiRecord[] }[] = []
   const map: Record<string, ApiRecord[]> = {}
@@ -37,66 +83,59 @@ function groupByDate(records: ApiRecord[]) {
 }
 
 export default function RecordsPage() {
-  const [records, setRecords] = useState<ApiRecord[]>([])
+  const [allRecords, setAllRecords] = useState<ApiRecord[]>([]) // 所有记录
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [offset, setOffset] = useState(0)
-  const PAGE_SIZE = 20
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  })
 
   // 初始加载
   useDidShow(async () => {
+    await loadRecords()
+  })
+
+  async function loadRecords() {
     setLoading(true)
-    setOffset(0)
-    setHasMore(true)
     try {
       const baby = await getCurrentBaby()
       if (!baby) {
-        setRecords([])
+        setAllRecords([])
         return
       }
-      const response = await getRecords({ babyId: baby.id, limit: PAGE_SIZE, offset: 0 })
-      setRecords(response.records)
-      setHasMore(response.pagination.hasMore)
-      setOffset(PAGE_SIZE)
+
+      // 计算日期范围
+      const startOfDay = new Date(selectedDate)
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(selectedDate)
+      endOfDay.setHours(23, 59, 59, 999)
+
+      // 先尝试从缓存加载
+      const cacheKey = `${baby.id}_${selectedDate}`
+      const cachedRecords = loadCache(baby.id, '', selectedDate)
+      if (cachedRecords) {
+        setAllRecords(cachedRecords)
+        setLoading(false)
+      }
+
+      // 异步请求最新数据（不传 category，获取所有类型）
+      const response = await getRecords({
+        babyId: baby.id,
+        limit: 1000,
+        offset: 0,
+        startDate: startOfDay.getTime(),
+        endDate: endOfDay.getTime(),
+      })
+
+      setAllRecords(response.records)
+      // 保存到缓存
+      saveCache(baby.id, '', selectedDate, response.records)
     } catch (error) {
       console.error('加载记录失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
     } finally {
       setLoading(false)
-    }
-  })
-
-  // 加载更多
-  async function loadMore() {
-    if (loadingMore || !hasMore) return
-    
-    setLoadingMore(true)
-    try {
-      const baby = await getCurrentBaby()
-      if (!baby) return
-      
-      const response = await getRecords({ 
-        babyId: baby.id, 
-        limit: PAGE_SIZE, 
-        offset 
-      })
-      
-      setRecords(prev => [...prev, ...response.records])
-      setHasMore(response.pagination.hasMore)
-      setOffset(prev => prev + PAGE_SIZE)
-    } catch (error) {
-      console.error('加载更多失败:', error)
-      Taro.showToast({ title: '加载失败', icon: 'none' })
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  // 滚动到底部触发加载更多
-  function handleScrollToLower() {
-    if (!loading && hasMore && !loadingMore) {
-      loadMore()
     }
   }
 
@@ -113,7 +152,13 @@ export default function RecordsPage() {
         await deleteRecord(id)
         Taro.showToast({ title: '删除成功', icon: 'success' })
         // 从列表中移除该记录
-        setRecords(prev => prev.filter(r => r.id !== id))
+        const newRecords = allRecords.filter(r => r.id !== id)
+        setAllRecords(newRecords)
+        // 更新缓存
+        const baby = await getCurrentBaby()
+        if (baby) {
+          saveCache(baby.id, '', selectedDate, newRecords)
+        }
       } catch (error) {
         console.error('删除失败:', error)
         Taro.showToast({ title: '删除失败', icon: 'none' })
@@ -121,72 +166,118 @@ export default function RecordsPage() {
     }
   }
 
-  const groups = groupByDate(records)
+  function handleEdit(record: ApiRecord) {
+    // 根据类型跳转到对应的编辑页面，通过 URL 参数传递记录数据
+    const pathMap = {
+      food: '/pages/food/index',
+      sleep: '/pages/sleep/index',
+      shit: '/pages/shit/index',
+      other: '/pages/other/index',
+    }
+    
+    const path = pathMap[record.category] || '/pages/home/index'
+    // 将记录数据存储到全局变量或缓存中
+    Taro.setStorageSync('editRecord', record)
+    Taro.navigateTo({
+      url: `${path}?editId=${record.id}`,
+    })
+  }
+
+  // 前端筛选：根据类型过滤记录
+  const filteredRecords = categoryFilter 
+    ? allRecords.filter(r => r.category === categoryFilter)
+    : allRecords
+
+  const groups = groupByDate(filteredRecords)
 
   return (
-    <ScrollView 
-      className='records-page' 
-      scrollY
-      onScrollToLower={handleScrollToLower}
-      lowerThreshold={50}
-    >
-      {loading ? (
-        <View className='loading-state'>
-          <Text>加载中...</Text>
+    <View className='records-page'>
+      {/* 筛选栏 */}
+      <View className='filter-bar'>
+        <View className='filter-section'>
+          <Text className='filter-label'>日期</Text>
+          <Picker
+            mode='date'
+            value={selectedDate}
+            onChange={e => {
+              setSelectedDate(e.detail.value)
+              // 延迟加载，等待状态更新
+              setTimeout(() => loadRecords(), 50)
+            }}
+          >
+            <View className='date-picker-btn'>
+              <Text>{selectedDate}</Text>
+            </View>
+          </Picker>
         </View>
-      ) : groups.length === 0 ? (
-        <View className='empty-state'>
-          <Text className='empty-icon'>📋</Text>
-          <Text className='empty-text'>还没有任何记录</Text>
-          <Text className='empty-sub'>快去首页记录宝宝的日常吧~</Text>
-        </View>
-      ) : (
-        <>
-          {groups.map(group => (
-            <View key={group.date} className='date-group'>
-              <View className='date-header'>
-                <Text className='date-text'>{group.date}</Text>
-                <Text className='date-count'>{group.records.length} 条</Text>
-              </View>
 
-              {group.records.map(record => (
-                <View key={record.id} className='record-card'>
-                  <View
-                    className='category-badge'
-                    style={{
-                      background: CATEGORY_STYLE[record.category]?.bg ?? '#f5f5f5',
-                      color: CATEGORY_STYLE[record.category]?.color ?? '#666',
-                    }}
-                  >
-                    <Text>{CATEGORY_LABELS[record.category]}</Text>
-                  </View>
-                  <View className='record-body'>
-                    <Text className='record-summary'>{formatRecordSummary(record)}</Text>
-                    <Text className='record-time'>{formatTimestamp(record.startTime)}</Text>
-                    <Text className='record-reporter'>👤 记录人 {record.reporterRole || '家长'}</Text>
-                  </View>
-                  <View className='delete-btn' onClick={() => handleDelete(record.id)}>
-                    <Text className='delete-icon'>✕</Text>
-                  </View>
+        <View className='filter-section'>
+          <Text className='filter-label'>类型</Text>
+          <View className='category-filters'>
+            {CATEGORY_FILTERS.map(cat => (
+              <View
+                key={cat.value}
+                className={`filter-chip ${categoryFilter === cat.value ? 'active' : ''}`}
+                onClick={() => setCategoryFilter(cat.value)}
+              >
+                <Text>{cat.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <ScrollView className='records-scroll' scrollY>
+        {loading ? (
+          <View className='loading-state'>
+            <Text>加载中...</Text>
+          </View>
+        ) : groups.length === 0 ? (
+          <View className='empty-state'>
+            <Text className='empty-icon'>📋</Text>
+            <Text className='empty-text'>还没有任何记录</Text>
+            <Text className='empty-sub'>快去首页记录宝宝的日常吧~</Text>
+          </View>
+        ) : (
+          <>
+            {groups.map(group => (
+              <View key={group.date} className='date-group'>
+                <View className='date-header'>
+                  <Text className='date-text'>{group.date}</Text>
+                  <Text className='date-count'>{group.records.length} 条</Text>
                 </View>
-              ))}
-            </View>
-          ))}
-          
-          {/* 加载更多提示 */}
-          {loadingMore && (
-            <View className='loading-more'>
-              <Text>加载中...</Text>
-            </View>
-          )}
-          
-          {!hasMore && records.length > 0 && (
-            <View className='no-more'>
-              <Text>没有更多了</Text>
-            </View>
-          )}
-        </>
-      )}
-    </ScrollView>
+
+                {group.records.map(record => (
+                  <View key={record.id} className='record-card'>
+                    <View
+                      className='category-badge'
+                      style={{
+                        background: CATEGORY_STYLE[record.category]?.bg ?? '#f5f5f5',
+                        color: CATEGORY_STYLE[record.category]?.color ?? '#666',
+                      }}
+                    >
+                      <Text>{CATEGORY_LABELS[record.category]}</Text>
+                    </View>
+                    <View className='record-body'>
+                      <Text className='record-summary'>{formatRecordSummary(record)}</Text>
+                      <Text className='record-time'>{formatTimestamp(record.startTime)}</Text>
+                      <Text className='record-reporter'>👤 记录人 {record.reporterRole || '家长'}</Text>
+                    </View>
+                    <View className='record-actions'>
+                      <View className='edit-btn' onClick={() => handleEdit(record)}>
+                        <Text className='edit-icon'>✎</Text>
+                      </View>
+                      <View className='delete-btn' onClick={() => handleDelete(record.id)}>
+                        <Text className='delete-icon'>✕</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
   )
 }

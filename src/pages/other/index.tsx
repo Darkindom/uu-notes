@@ -1,10 +1,10 @@
 import { View, Text, Input, Picker, Button } from '@tarojs/components'
-import Taro, { useLoad } from '@tarojs/taro'
+import Taro, { useLoad, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
 // 已迁移到自建后端 API
-import { createRecord, getRecentRecordsByCategory, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
+import { createRecord, updateRecord, getRecentRecordsByCategory, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
 // import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db' // 云开发已废弃
-import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES, formatRecordSummary } from '../../utils/format'
+import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES, formatRecordSummary, timestampToDateTime } from '../../utils/format'
 import './index.less'
 
 type SubType = 'tonic' | 'outdoor' | 'cry' | 'gear'
@@ -19,6 +19,10 @@ const SUB_MENUS: { label: string; value: SubType }[] = [
 const GEAR_TYPES = ['带上', '脱下']
 
 export default function OtherPage() {
+  const router = useRouter()
+  const editId = router.params.editId ? parseInt(router.params.editId) : null
+  const isEdit = !!editId
+
   const dt = getCurrentDateTime()
   const [date, setDate] = useState(dt.date)
   const [time, setTime] = useState(dt.time)
@@ -31,6 +35,25 @@ export default function OtherPage() {
 
   useLoad(async () => {
     try {
+      // 如果是编辑模式，从缓存读取记录详情
+      if (isEdit && editId) {
+        const record = Taro.getStorageSync('editRecord')
+        if (record && record.id === editId) {
+          const dt = timestampToDateTime(record.startTime)
+          setDate(dt.date)
+          setTime(dt.time)
+          setSubType(record.subCategory as SubType)
+          
+          if (record.subCategory === 'tonic' && record.extra) {
+            setTonicType(record.extra.tonic_type || TONIC_TYPES[0])
+          } else if (record.subCategory === 'gear' && record.extra) {
+            setGearType(record.extra.gear_type || GEAR_TYPES[0])
+          } else {
+            setDuration(record.value || '')
+          }
+        }
+      }
+
       const records = await getRecentRecordsByCategory('other', 5)
       // 去重：使用 formatRecordSummary 生成的摘要作为唯一标识
       const uniqueRecords: ApiRecord[] = []
@@ -46,7 +69,7 @@ export default function OtherPage() {
       
       setRecentRecords(uniqueRecords)
     } catch (error) {
-      console.error('加载历史记录失败:', error)
+      console.error('加载数据失败:', error)
     }
   })
 
@@ -107,20 +130,34 @@ export default function OtherPage() {
       }
 
       const startTime = dateTimeToTimestamp(date, time)
-      await createRecord({
-        babyId: baby.id,
-        category: 'other',
-        subCategory: subType,
-        startTime,
-        value,
-        extra,
-      })
 
-      Taro.showToast({ title: '记录成功！', icon: 'success' })
+      if (isEdit && editId) {
+        // 更新记录
+        await updateRecord(editId, {
+          category: 'other',
+          subCategory: subType,
+          startTime,
+          value,
+          extra,
+        })
+        Taro.showToast({ title: '更新成功！', icon: 'success' })
+      } else {
+        // 创建新记录
+        await createRecord({
+          babyId: baby.id,
+          category: 'other',
+          subCategory: subType,
+          startTime,
+          value,
+          extra,
+        })
+        Taro.showToast({ title: '记录成功！', icon: 'success' })
+      }
+
       setTimeout(() => Taro.navigateBack(), 1000)
     } catch (error) {
-      console.error('记录失败:', error)
-      Taro.showToast({ title: '记录失败', icon: 'none' })
+      console.error('操作失败:', error)
+      Taro.showToast({ title: isEdit ? '更新失败' : '记录失败', icon: 'none' })
     } finally {
       setLoading(false)
     }
@@ -211,8 +248,8 @@ export default function OtherPage() {
           </View>
         )}
 
-        {/* Prefill - 移到最下面 */}
-        {recentRecords.length > 0 && (
+        {/* Prefill - 移到最下面，编辑时不显示 */}
+        {!isEdit && recentRecords.length > 0 && (
           <View className='section section-vertical'>
             <Text className='field-label'>最近的记录</Text>
             <View className='prefill-row'>
@@ -227,7 +264,7 @@ export default function OtherPage() {
       </View>
 
       <Button className='submit-btn' onClick={handleSubmit} loading={loading} disabled={loading}>
-        记录
+        {isEdit ? '更新' : '记录'}
       </Button>
     </View>
   )

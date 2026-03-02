@@ -27,6 +27,7 @@ interface TodayStats {
 export default function BabySelectorPage() {
   const [babies, setBabies] = useState<Baby[]>([])
   const [currentBabyId, setCurrentBabyId] = useState<number | undefined>(undefined)
+  const [currentUserId, setCurrentUserId] = useState<number | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [selectedBaby, setSelectedBaby] = useState<Baby | null>(null)
@@ -62,6 +63,7 @@ export default function BabySelectorPage() {
       const [babyList, user] = await Promise.all([getBabies(), getCurrentUser()])
       setBabies(babyList)
       setCurrentBabyId(user?.currentBabyId)
+      setCurrentUserId(user?.id)
 
       // 加载当前宝宝的今日统计
       if (user?.currentBabyId) {
@@ -82,15 +84,30 @@ export default function BabySelectorPage() {
       const endOfDay = new Date()
       endOfDay.setHours(23, 59, 59, 999)
 
-      // 使用日期范围参数获取今天的所有记录
-      const response = await getRecords({
+      // 获取今天的所有记录
+      const todayResponse = await getRecords({
         babyId,
         limit: 1000,
         offset: 0,
         startDate: startOfDay.getTime(),
         endDate: endOfDay.getTime(),
       })
-      const todayRecords = response.records
+      const todayRecords = todayResponse.records
+
+      // 获取昨天最后的护具记录，检查是否有未脱下的
+      const yesterdayStart = new Date(startOfDay)
+      yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+      const yesterdayEnd = new Date(startOfDay)
+      yesterdayEnd.setMilliseconds(-1)
+
+      const yesterdayResponse = await getRecords({
+        babyId,
+        limit: 1,
+        offset: 0,
+        startDate: yesterdayStart.getTime(),
+        endDate: yesterdayEnd.getTime(),
+        category: 'other',
+      })
 
       const stats: TodayStats = {
         milk: 0,
@@ -148,23 +165,88 @@ export default function BabySelectorPage() {
         }
       })
 
+      // 检查昨天最后的护具状态
+      let yesterdayLastGearOn = false
+      if (yesterdayResponse.records.length > 0) {
+        // 获取昨天所有护具记录来判断最后状态
+        const yesterdayAllGear = await getRecords({
+          babyId,
+          limit: 1000,
+          offset: 0,
+          startDate: yesterdayStart.getTime(),
+          endDate: yesterdayEnd.getTime(),
+        })
+        
+        const yesterdayGearEvents = yesterdayAllGear.records
+          .filter(r => r.category === 'other' && r.subCategory === 'gear')
+          .map(r => ({
+            type: r.extra?.gear_type === '带上' ? 'on' : 'off',
+            time: r.startTime
+          }))
+          .sort((a, b) => a.time - b.time)
+
+        // 判断昨天最后一次操作
+        if (yesterdayGearEvents.length > 0) {
+          const lastEvent = yesterdayGearEvents[yesterdayGearEvents.length - 1]
+          yesterdayLastGearOn = lastEvent.type === 'on'
+        }
+      }
+
       // 计算护具佩戴时长
       gearEvents.sort((a, b) => a.time - b.time)
+      
+      // 过滤掉连续的相同操作，只保留状态变化的事件
+      const filteredGearEvents: { type: 'on' | 'off'; time: number }[] = []
+      let lastType: 'on' | 'off' | null = yesterdayLastGearOn ? 'on' : null
+      
+      for (const event of gearEvents) {
+        if (event.type !== lastType) {
+          filteredGearEvents.push(event)
+          lastType = event.type
+        }
+        // 如果 event.type === lastType，说明是连续的相同操作，忽略
+      }
+      
       let totalGearMinutes = 0
       let lastOnTime: number | null = null
 
-      gearEvents.forEach((event) => {
-        if (event.type === 'on') {
-          lastOnTime = event.time
-        } else if (event.type === 'off' && lastOnTime !== null) {
-          totalGearMinutes += (event.time - lastOnTime) / (1000 * 60)
-          lastOnTime = null
+      // 如果昨天最后是带上状态，从今天0点开始计算
+      if (yesterdayLastGearOn && filteredGearEvents.length > 0) {
+        // 如果今天第一个事件是"脱下"，说明从0点到脱下这段时间一直戴着
+        if (filteredGearEvents[0].type === 'off') {
+          totalGearMinutes += (filteredGearEvents[0].time - startOfDay.getTime()) / (1000 * 60)
+        } else {
+          // 如果今天第一个是"带上"，说明昨天虽然带上了但今天重新带上，不计算0点到第一个事件的时间
+          lastOnTime = filteredGearEvents[0].time
         }
-      })
+        // 从第二个事件开始处理
+        for (let i = 1; i < filteredGearEvents.length; i++) {
+          const event = filteredGearEvents[i]
+          if (event.type === 'on') {
+            lastOnTime = event.time
+          } else if (event.type === 'off' && lastOnTime !== null) {
+            totalGearMinutes += (event.time - lastOnTime) / (1000 * 60)
+            lastOnTime = null
+          }
+        }
+      } else {
+        // 正常处理今天的事件
+        filteredGearEvents.forEach((event) => {
+          if (event.type === 'on') {
+            lastOnTime = event.time
+          } else if (event.type === 'off' && lastOnTime !== null) {
+            totalGearMinutes += (event.time - lastOnTime) / (1000 * 60)
+            lastOnTime = null
+          }
+        })
+      }
 
       // 如果有未脱下的，计算到当前时间
       if (lastOnTime !== null) {
         totalGearMinutes += (Date.now() - lastOnTime) / (1000 * 60)
+      } else if (yesterdayLastGearOn && filteredGearEvents.length === 0) {
+        // 昨天带上了，今天没有任何护具记录，说明一直戴着
+        totalGearMinutes += (Date.now() - startOfDay.getTime()) / (1000 * 60)
       }
 
       stats.gearHours = Math.round((totalGearMinutes / 60) * 10) / 10 // 保留1位小数
@@ -202,12 +284,40 @@ export default function BabySelectorPage() {
     Taro.navigateTo({ url: '/pages/add-baby/index' })
   }
 
-  async function handleDelete(babyId: number, babyName: string, e: any) {
+  function handleEdit(baby: Baby, e: any) {
     e.stopPropagation()
+    
+    // 检查权限
+    if (baby.creatorId !== currentUserId) {
+      Taro.showModal({
+        title: '提示',
+        content: '目前仅支持创建者编辑宝宝信息',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+
+    Taro.navigateTo({ url: `/pages/edit-baby/index?id=${baby.id}` })
+  }
+
+  async function handleDelete(baby: Baby, e: any) {
+    e.stopPropagation()
+
+    // 检查权限
+    if (baby.creatorId !== currentUserId) {
+      Taro.showModal({
+        title: '提示',
+        content: '目前仅支持创建者删除宝宝',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
 
     const res = await Taro.showModal({
       title: '确认删除',
-      content: `确定要删除宝宝"${babyName}"吗？删除后所有相关记录将被清空且无法恢复。`,
+      content: `确定要删除宝宝"${baby.name}"吗？删除后所有相关记录将被清空且无法恢复。`,
       confirmText: '删除',
       cancelText: '取消',
       confirmColor: '#ff4d4f',
@@ -217,7 +327,7 @@ export default function BabySelectorPage() {
 
     try {
       Taro.showLoading({ title: '删除中...' })
-      await deleteBaby(babyId)
+      await deleteBaby(baby.id)
       // 清除首页缓存
       clearIndexCache()
       Taro.hideLoading()
@@ -225,7 +335,7 @@ export default function BabySelectorPage() {
       await loadBabies()
 
       // 如果删除的是当前选中的宝宝，重新加载页面
-      if (babyId === currentBabyId) {
+      if (baby.id === currentBabyId) {
         setTimeout(() => {
           Taro.switchTab({ url: '/pages/home/index' })
         }, 500)
@@ -283,6 +393,19 @@ export default function BabySelectorPage() {
                   key={baby.id}
                   className={`baby-card ${baby.id === currentBabyId ? 'active' : ''}`}
                 >
+                  {/* 右上角操作按钮 */}
+                  <View className='baby-header-actions'>
+                    <View className='action-icon' onClick={(e) => handleViewMembers(baby, e)}>
+                      <Text className='action-text'>成员</Text>
+                    </View>
+                    <View className='action-icon' onClick={(e) => handleEdit(baby, e)}>
+                      <Text className='action-text'>编辑</Text>
+                    </View>
+                    <View className='action-icon delete' onClick={(e) => handleDelete(baby, e)}>
+                      <Text className='action-text'>删除</Text>
+                    </View>
+                  </View>
+
                   <View className='baby-content' onClick={() => handleSwitch(baby.id)}>
                     <View className='baby-avatar'>{baby.gender === 'male' ? '👦' : '👧'}</View>
                     <View className='baby-info'>
@@ -295,22 +418,6 @@ export default function BabySelectorPage() {
                         <Text>当前</Text>
                       </View>
                     )}
-                  </View>
-                  <View className='baby-actions'>
-                    <Button
-                      className='view-members-btn'
-                      size='mini'
-                      onClick={(e) => handleViewMembers(baby, e)}
-                    >
-                      查看成员
-                    </Button>
-                    <Button
-                      className='delete-btn'
-                      size='mini'
-                      onClick={(e) => handleDelete(baby.id, baby.name, e)}
-                    >
-                      删除
-                    </Button>
                   </View>
                 </View>
               ))}

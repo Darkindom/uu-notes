@@ -193,6 +193,15 @@ export const createBaby = (data: {
   return request<Baby>({ url: '/babies', method: 'POST', data })
 }
 
+export const updateBaby = (id: number, data: {
+  name: string
+  gender: string
+  birthday: number
+  avatarUrl?: string
+}): Promise<void> => {
+  return request({ url: `/babies/${id}`, method: 'PUT', data })
+}
+
 export const deleteBaby = (id: number): Promise<void> => {
   return request({ url: `/babies/${id}`, method: 'DELETE' })
 }
@@ -244,6 +253,10 @@ export const getRecords = (params: {
   }))
 }
 
+export const getRecord = (id: number): Promise<Record> => {
+  return request<Record>({ url: `/records/${id}` })
+}
+
 export const createRecord = (data: {
   babyId: number
   category: string
@@ -255,6 +268,18 @@ export const createRecord = (data: {
   note?: string
 }): Promise<Record> => {
   return request<Record>({ url: '/records', method: 'POST', data })
+}
+
+export const updateRecord = (id: number, data: {
+  category: string
+  subCategory?: string
+  startTime: number
+  endTime?: number
+  value?: string
+  extra?: any
+  note?: string
+}): Promise<void> => {
+  return request({ url: `/records/${id}`, method: 'PUT', data })
 }
 
 export const deleteRecord = (id: number): Promise<void> => {

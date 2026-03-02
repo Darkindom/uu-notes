@@ -332,14 +332,48 @@ app.post('/api/babies', verifyToken, (req, res) => {
   }
 })
 
+app.put('/api/babies/:id', verifyToken, (req, res) => {
+  try {
+    const babyId = parseInt(req.params.id)
+    const { name, gender, birthday, avatarUrl } = req.body
+
+    // 检查权限：只有创建者可以编辑
+    const baby = db.prepare('SELECT * FROM babies WHERE id = ?').get(babyId)
+    if (!baby) {
+      return res.status(404).json({ error: '宝宝不存在' })
+    }
+    if (baby.creatorId !== req.userId) {
+      return res.status(403).json({ error: '只有创建者可以编辑宝宝信息' })
+    }
+
+    const now = Date.now()
+
+    db.prepare(
+      `
+      UPDATE babies
+      SET name = ?, gender = ?, birthday = ?, avatarUrl = ?, updatedAt = ?
+      WHERE id = ?
+    `,
+    ).run(name, gender, birthday, avatarUrl, now, babyId)
+
+    res.json({ success: true })
+  } catch (error) {
+    console.error('更新宝宝信息失败:', error)
+    res.status(500).json({ error: '更新宝宝信息失败' })
+  }
+})
+
 app.delete('/api/babies/:id', verifyToken, (req, res) => {
   try {
     const babyId = parseInt(req.params.id)
 
-    // 检查权限
+    // 检查权限：只有创建者可以删除
     const baby = db.prepare('SELECT * FROM babies WHERE id = ?').get(babyId)
-    if (!baby || baby.creatorId !== req.userId) {
-      return res.status(403).json({ error: '无权删除此宝宝' })
+    if (!baby) {
+      return res.status(404).json({ error: '宝宝不存在' })
+    }
+    if (baby.creatorId !== req.userId) {
+      return res.status(403).json({ error: '只有创建者可以删除宝宝' })
     }
 
     // 删除宝宝的所有记录
@@ -371,6 +405,36 @@ app.delete('/api/babies/:id', verifyToken, (req, res) => {
 })
 
 // ============ 记录接口 ============
+
+app.get('/api/records/:id', verifyToken, (req, res) => {
+  try {
+    const recordId = parseInt(req.params.id)
+
+    const query = `
+      SELECT r.*, bm.role as reporterRole
+      FROM records r
+      LEFT JOIN baby_members bm ON r.babyId = bm.babyId AND r.reporterId = bm.userId
+      WHERE r.id = ?
+    `
+    const record = db.prepare(query).get(recordId)
+
+    if (!record) {
+      return res.status(404).json({ error: '记录不存在' })
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...record,
+        extra: record.extra ? JSON.parse(record.extra) : null,
+        reporterRole: record.reporterRole || '家长',
+      },
+    })
+  } catch (error) {
+    console.error('获取记录详情失败:', error)
+    res.status(500).json({ error: '获取记录详情失败' })
+  }
+})
 
 app.get('/api/records', verifyToken, (req, res) => {
   try {
@@ -507,16 +571,55 @@ app.post('/api/records', verifyToken, (req, res) => {
   }
 })
 
+app.put('/api/records/:id', verifyToken, (req, res) => {
+  try {
+    const recordId = parseInt(req.params.id)
+    const { category, subCategory, startTime, endTime, value, extra, note } = req.body
+    const now = Date.now()
+
+    // 检查记录是否存在
+    const record = db.prepare('SELECT * FROM records WHERE id = ?').get(recordId)
+    if (!record) {
+      return res.status(404).json({ error: '记录不存在' })
+    }
+
+    // 更新记录（所有人都可以编辑）
+    db.prepare(
+      `
+      UPDATE records
+      SET category = ?, subCategory = ?, startTime = ?, endTime = ?, value = ?, extra = ?, note = ?, updatedAt = ?
+      WHERE id = ?
+    `,
+    ).run(
+      category,
+      subCategory,
+      startTime,
+      endTime,
+      value,
+      extra ? JSON.stringify(extra) : null,
+      note,
+      now,
+      recordId,
+    )
+
+    res.json({ success: true })
+  } catch (error) {
+    console.error('更新记录失败:', error)
+    res.status(500).json({ error: '更新记录失败' })
+  }
+})
+
 app.delete('/api/records/:id', verifyToken, (req, res) => {
   try {
     const recordId = parseInt(req.params.id)
 
-    // 检查权限
+    // 检查记录是否存在
     const record = db.prepare('SELECT * FROM records WHERE id = ?').get(recordId)
-    if (!record || record.reporterId !== req.userId) {
-      return res.status(403).json({ error: '无权删除此记录' })
+    if (!record) {
+      return res.status(404).json({ error: '记录不存在' })
     }
 
+    // 所有人都可以删除记录
     db.prepare('DELETE FROM records WHERE id = ?').run(recordId)
 
     res.json({ success: true })

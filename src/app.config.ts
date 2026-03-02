@@ -6,6 +6,7 @@ export default defineAppConfig({
     'pages/records/index',
     'pages/onboarding/index',
     'pages/add-baby/index',
+    'pages/edit-baby/index',
     'pages/food/index',
     'pages/sleep/index',
     'pages/shit/index',
