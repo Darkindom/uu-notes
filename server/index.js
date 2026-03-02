@@ -5,9 +5,17 @@ const Database = require('better-sqlite3')
 const jwt = require('jsonwebtoken')
 const fs = require('fs')
 const path = require('path')
+const NodeCache = require('node-cache')
 
 const app = express()
 const PORT = process.env.PORT || 1717
+
+// 初始化缓存：stdTTL 为默认过期时间（秒），checkperiod 为检查过期的周期
+const cache = new NodeCache({ 
+  stdTTL: 300,        // 5分钟默认过期
+  checkperiod: 60,    // 每60秒检查一次过期
+  useClones: false    // 不克隆对象，提高性能
+})
 
 // 确保数据目录存在
 const dataDir = path.dirname(process.env.DB_PATH || './data/uu-notes.db')
@@ -81,6 +89,22 @@ db.exec(`
 `)
 
 console.log('数据库初始化完成')
+
+// 缓存辅助函数
+function generateCacheKey(prefix, params) {
+  return `${prefix}:${JSON.stringify(params)}`
+}
+
+// 清除相关缓存
+function clearRecordsCacheForBaby(babyId) {
+  const keys = cache.keys()
+  keys.forEach(key => {
+    if (key.startsWith('records:') && key.includes(`"babyId":${babyId}`)) {
+      cache.del(key)
+    }
+  })
+  console.log(`已清除宝宝 ${babyId} 的相关记录缓存`)
+}
 
 // 中间件
 app.use(
@@ -245,15 +269,29 @@ app.put('/api/user/current', verifyToken, (req, res) => {
 
 app.get('/api/babies', verifyToken, (req, res) => {
   try {
+    // 生成缓存键
+    const cacheKey = generateCacheKey('babies', { userId: req.userId })
+
+    // 尝试从缓存获取
+    const cachedData = cache.get(cacheKey)
+    if (cachedData) {
+      console.log('✅ 从缓存返回宝宝列表', cacheKey)
+      return res.json(cachedData)
+    }
+
     const user = db.prepare('SELECT babyIds FROM users WHERE id = ?').get(req.userId)
 
     if (!user || !user.babyIds) {
-      return res.json({ success: true, data: [] })
+      const emptyResponse = { success: true, data: [] }
+      cache.set(cacheKey, emptyResponse, 60) // 空列表缓存时间短一些
+      return res.json(emptyResponse)
     }
 
     const babyIds = JSON.parse(user.babyIds)
     if (babyIds.length === 0) {
-      return res.json({ success: true, data: [] })
+      const emptyResponse = { success: true, data: [] }
+      cache.set(cacheKey, emptyResponse, 60)
+      return res.json(emptyResponse)
     }
 
     const placeholders = babyIds.map(() => '?').join(',')
@@ -282,10 +320,16 @@ app.get('/api/babies', verifyToken, (req, res) => {
       }
     })
 
-    res.json({
+    const responseData = {
       success: true,
       data: babiesWithMembers,
-    })
+    }
+
+    // 存入缓存
+    cache.set(cacheKey, responseData)
+    console.log('💾 缓存宝宝列表', cacheKey)
+
+    res.json(responseData)
   } catch (error) {
     console.error('获取宝宝列表失败:', error)
     res.status(500).json({ error: '获取宝宝列表失败' })
@@ -344,6 +388,10 @@ app.post('/api/babies', verifyToken, (req, res) => {
         updatedAt: now,
       },
     })
+
+    // 清除用户的宝宝列表缓存
+    const userCacheKey = generateCacheKey('babies', { userId: req.userId })
+    cache.del(userCacheKey)
   } catch (error) {
     console.error('创建宝宝失败:', error)
     res.status(500).json({ error: '创建宝宝失败' })
@@ -375,6 +423,10 @@ app.put('/api/babies/:id', verifyToken, (req, res) => {
     ).run(name, gender, birthday, avatarUrl, now, babyId)
 
     res.json({ success: true })
+
+    // 清除用户的宝宝列表缓存
+    const userCacheKey = generateCacheKey('babies', { userId: req.userId })
+    cache.del(userCacheKey)
   } catch (error) {
     console.error('更新宝宝信息失败:', error)
     res.status(500).json({ error: '更新宝宝信息失败' })
@@ -416,6 +468,11 @@ app.delete('/api/babies/:id', verifyToken, (req, res) => {
     ).run(JSON.stringify(newBabyIds), newCurrentBabyId, Date.now(), req.userId)
 
     res.json({ success: true })
+
+    // 清除相关缓存
+    const userCacheKey = generateCacheKey('babies', { userId: req.userId })
+    cache.del(userCacheKey)
+    clearRecordsCacheForBaby(babyId)
   } catch (error) {
     console.error('删除宝宝失败:', error)
     res.status(500).json({ error: '删除宝宝失败' })
@@ -427,6 +484,16 @@ app.delete('/api/babies/:id', verifyToken, (req, res) => {
 app.get('/api/records/:id', verifyToken, (req, res) => {
   try {
     const recordId = parseInt(req.params.id)
+
+    // 生成缓存键
+    const cacheKey = generateCacheKey('record', { id: recordId })
+
+    // 尝试从缓存获取
+    const cachedData = cache.get(cacheKey)
+    if (cachedData) {
+      console.log('✅ 从缓存返回记录详情', cacheKey)
+      return res.json(cachedData)
+    }
 
     const query = `
       SELECT r.*, bm.role as reporterRole
@@ -440,14 +507,20 @@ app.get('/api/records/:id', verifyToken, (req, res) => {
       return res.status(404).json({ error: '记录不存在' })
     }
 
-    res.json({
+    const responseData = {
       success: true,
       data: {
         ...record,
         extra: record.extra ? JSON.parse(record.extra) : null,
         reporterRole: record.reporterRole || '家长',
       },
-    })
+    }
+
+    // 存入缓存
+    cache.set(cacheKey, responseData)
+    console.log('💾 缓存记录详情', cacheKey)
+
+    res.json(responseData)
   } catch (error) {
     console.error('获取记录详情失败:', error)
     res.status(500).json({ error: '获取记录详情失败' })
@@ -457,6 +530,23 @@ app.get('/api/records/:id', verifyToken, (req, res) => {
 app.get('/api/records', verifyToken, (req, res) => {
   try {
     const { babyId, category, limit = 20, offset = 0, startDate, endDate } = req.query
+
+    // 生成缓存键
+    const cacheKey = generateCacheKey('records', { 
+      babyId, 
+      category, 
+      limit, 
+      offset, 
+      startDate, 
+      endDate 
+    })
+
+    // 尝试从缓存获取
+    const cachedData = cache.get(cacheKey)
+    if (cachedData) {
+      console.log('✅ 从缓存返回记录数据', cacheKey)
+      return res.json(cachedData)
+    }
 
     let query = `
       SELECT r.*, bm.role as reporterRole
@@ -520,7 +610,7 @@ app.get('/api/records', verifyToken, (req, res) => {
     
     const { total } = db.prepare(countQuery).get(...countParams)
 
-    res.json({
+    const responseData = {
       success: true,
       data: records.map((r) => ({
         ...r,
@@ -533,7 +623,13 @@ app.get('/api/records', verifyToken, (req, res) => {
         offset: parseInt(offset),
         hasMore: parseInt(offset) + records.length < total,
       },
-    })
+    }
+
+    // 存入缓存
+    cache.set(cacheKey, responseData)
+    console.log('💾 缓存记录数据', cacheKey)
+
+    res.json(responseData)
   } catch (error) {
     console.error('获取记录失败:', error)
     res.status(500).json({ error: '获取记录失败' })
@@ -583,6 +679,9 @@ app.post('/api/records', verifyToken, (req, res) => {
         updatedAt: now,
       },
     })
+
+    // 清除相关缓存
+    clearRecordsCacheForBaby(babyId)
   } catch (error) {
     console.error('创建记录失败:', error)
     res.status(500).json({ error: '创建记录失败' })
@@ -621,6 +720,9 @@ app.put('/api/records/:id', verifyToken, (req, res) => {
     )
 
     res.json({ success: true })
+
+    // 清除相关缓存
+    clearRecordsCacheForBaby(record.babyId)
   } catch (error) {
     console.error('更新记录失败:', error)
     res.status(500).json({ error: '更新记录失败' })
@@ -641,6 +743,9 @@ app.delete('/api/records/:id', verifyToken, (req, res) => {
     db.prepare('DELETE FROM records WHERE id = ?').run(recordId)
 
     res.json({ success: true })
+
+    // 清除相关缓存
+    clearRecordsCacheForBaby(record.babyId)
   } catch (error) {
     console.error('删除记录失败:', error)
     res.status(500).json({ error: '删除记录失败' })
