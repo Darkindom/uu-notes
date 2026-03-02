@@ -31,6 +31,7 @@ export default function BabySelectorPage() {
   const [currentBabyId, setCurrentBabyId] = useState<number | undefined>(undefined)
   const [currentUserId, setCurrentUserId] = useState<number | undefined>(undefined)
   const [loading, setLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(false)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [selectedBaby, setSelectedBaby] = useState<Baby | null>(null)
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null)
@@ -86,6 +87,7 @@ export default function BabySelectorPage() {
 
   async function loadTodayStats(babyId: number, date: Date = new Date()) {
     try {
+      setStatsLoading(true)
       console.log('loadTodayStats 开始', babyId, date)
       const startOfDay = new Date(date)
       startOfDay.setHours(0, 0, 0, 0)
@@ -271,6 +273,8 @@ export default function BabySelectorPage() {
       console.error('加载今日统计失败:', error)
       // 即使加载统计失败也不影响页面显示
       setTodayStats(null)
+    } finally {
+      setStatsLoading(false)
     }
   }
 
@@ -430,14 +434,14 @@ export default function BabySelectorPage() {
                   className={`baby-card ${baby.id === currentBabyId ? 'active' : ''}`}
                 >
                   {/* 右上角操作按钮 */}
-                  <View className='baby-header-actions'>
-                    <View className='action-icon' onClick={(e) => handleViewMembers(baby, e)}>
+                  <View className='baby-actions-top'>
+                    <View className='action-btn' onClick={(e) => handleViewMembers(baby, e)}>
                       <Text className='action-text'>成员</Text>
                     </View>
-                    <View className='action-icon' onClick={(e) => handleEdit(baby, e)}>
+                    <View className='action-btn' onClick={(e) => handleEdit(baby, e)}>
                       <Text className='action-text'>编辑</Text>
                     </View>
-                    <View className='action-icon delete' onClick={(e) => handleDelete(baby, e)}>
+                    <View className='action-btn delete' onClick={(e) => handleDelete(baby, e)}>
                       <Text className='action-text'>删除</Text>
                     </View>
                   </View>
@@ -449,6 +453,7 @@ export default function BabySelectorPage() {
                       <Text className='baby-age'>{getAge(baby.birthday)}</Text>
                       <Text className='baby-members'>{baby.memberIds?.length || 0} 位成员</Text>
                     </View>
+                    {/* 当前标签在内容右侧 */}
                     {baby.id === currentBabyId && (
                       <View className='current-badge'>
                         <Text>当前</Text>
@@ -468,26 +473,52 @@ export default function BabySelectorPage() {
           {todayStats && currentBabyId && (
             <View className='today-stats-section'>
               <View className='stats-header'>
-                <Text className='stats-title'>
-                  {dayjs(selectedDate).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD') ? '今日概况' : '当日概况'}
-                </Text>
-                <View className='stats-date-picker' onClick={handleOpenCalendar}>
-                  <Text className='stats-date'>{dayjs(selectedDate).format('YYYY.MM.DD')}</Text>
-                  <Text className='date-arrow'>▼</Text>
+                <View className='stats-header-top'>
+                  <Text className='stats-title'>
+                    {dayjs(selectedDate).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD') ? '今日概况' : '当日概况'}
+                  </Text>
+                  <View className='stats-date-wrapper'>
+                    <View className='stats-date-picker' onClick={handleOpenCalendar}>
+                      <Text className='stats-date'>{dayjs(selectedDate).format('YYYY.MM.DD')}</Text>
+                      <Text className='date-arrow'>▼</Text>
+                    </View>
+                  </View>
                 </View>
+                {dayjs(selectedDate).format('YYYY-MM-DD') !== dayjs().format('YYYY-MM-DD') && (
+                  <Text 
+                    className='back-to-today' 
+                    onClick={() => {
+                      setSelectedDate(new Date())
+                      if (currentBabyId) {
+                        loadTodayStats(currentBabyId, new Date())
+                      }
+                    }}
+                  >
+                    回到今天
+                  </Text>
+                )}
               </View>
               <View className='stats-content'>
-                {/* 吃 */}
-                {(todayStats.milk > 0 || todayStats.food > 0) && (
-                  <View className='stat-item'>
-                    <Text className='stat-label' style={{ color: '#FF9500' }}>吃</Text>
-                    <Text className='stat-value'>
-                      {todayStats.milk > 0 && `${todayStats.milk} ml 奶`}
-                      {todayStats.milk > 0 && todayStats.food > 0 && '，'}
-                      {todayStats.food > 0 && `${todayStats.food} 顿辅食`}
-                    </Text>
+                {/* 加载中 */}
+                {statsLoading && (
+                  <View className='stats-loading'>
+                    <Text className='loading-text'>加载中...</Text>
                   </View>
                 )}
+                
+                {!statsLoading && (
+                  <>
+                    {/* 吃 */}
+                    {(todayStats.milk > 0 || todayStats.food > 0) && (
+                      <View className='stat-item'>
+                        <Text className='stat-label' style={{ color: '#FF9500' }}>吃</Text>
+                        <Text className='stat-value'>
+                          {todayStats.milk > 0 && `${todayStats.milk} ml 奶`}
+                          {todayStats.milk > 0 && todayStats.food > 0 && '，'}
+                          {todayStats.food > 0 && `${todayStats.food} 顿辅食`}
+                        </Text>
+                      </View>
+                    )}
 
                 {/* 睡 */}
                 {todayStats.sleep > 0 && (
@@ -542,6 +573,8 @@ export default function BabySelectorPage() {
                   todayStats.gearHours === 0 && (
                     <Text className='stat-empty'>当天没有任何记录</Text>
                   )}
+                  </>
+                )}
               </View>
             </View>
           )}

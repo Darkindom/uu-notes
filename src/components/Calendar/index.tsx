@@ -118,19 +118,15 @@ export default function Calendar({
   // 选择日期
   function handleSelectDate(day: any) {
     if (day.isDisabled) return
-    setSelectedDate(day.date)
-  }
-
-  // 确认选择
-  function handleConfirm() {
-    onConfirm(selectedDate.toDate())
+    // 直接选择并关闭
+    onConfirm(day.date.toDate())
   }
 
   // 今天
   function handleToday() {
     const today = dayjs()
-    setCurrentMonth(today)
-    setSelectedDate(today)
+    // 直接选择今天并关闭
+    onConfirm(today.toDate())
   }
 
   if (!visible) return null
@@ -188,9 +184,6 @@ export default function Calendar({
         <View className='calendar-footer'>
           <View className='footer-btn today-btn' onClick={handleToday}>
             今天
-          </View>
-          <View className='footer-btn confirm-btn' onClick={handleConfirm}>
-            确定
           </View>
         </View>
       </View>
