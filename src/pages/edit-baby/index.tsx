@@ -1,13 +1,13 @@
 import { View, Text, Input, Button, Picker } from '@tarojs/components'
 import Taro, { useLoad, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
-import { updateBaby, getBabies, getCurrentUser } from '../../utils/api'
+import { updateBaby } from '../../utils/api'
 import { clearIndexCache } from '../../utils/cache'
 import './index.less'
 
 export default function EditBabyPage() {
   const router = useRouter()
-  const babyId = router.params.id ? parseInt(router.params.id) : null
+  const [babyId, setBabyId] = useState<number | null>(null)
   
   const [loading, setLoading] = useState(false)
   const [babyName, setBabyName] = useState('')
@@ -15,33 +15,41 @@ export default function EditBabyPage() {
   const [birthday, setBirthday] = useState('')
 
   useLoad(async () => {
-    if (!babyId) {
-      Taro.showToast({ title: '参数错误', icon: 'none' })
-      setTimeout(() => Taro.navigateBack(), 1000)
-      return
-    }
-
     try {
-      const babies = await getBabies()
-      const baby = babies.find(b => b.id === babyId)
-      
-      if (!baby) {
-        Taro.showToast({ title: '宝宝不存在', icon: 'none' })
+      // 从 URL 参数中获取宝宝数据
+      const dataParam = router.params.data
+      if (!dataParam) {
+        Taro.showToast({ title: '参数错误', icon: 'none' })
         setTimeout(() => Taro.navigateBack(), 1000)
         return
       }
 
-      setBabyName(baby.name)
-      setGender(baby.gender as 'male' | 'female')
-      const birthDate = new Date(baby.birthday)
+      const babyData = JSON.parse(decodeURIComponent(dataParam))
+      
+      if (!babyData.id) {
+        Taro.showToast({ title: '参数错误', icon: 'none' })
+        setTimeout(() => Taro.navigateBack(), 1000)
+        return
+      }
+
+      // 直接使用传递过来的数据，无需再次请求
+      setBabyId(babyData.id)
+      setBabyName(babyData.name)
+      setGender(babyData.gender as 'male' | 'female')
+      const birthDate = new Date(babyData.birthday)
       setBirthday(`${birthDate.getFullYear()}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`)
     } catch (error) {
       console.error('加载宝宝信息失败:', error)
-      Taro.showToast({ title: '加载失败', icon: 'none' })
+      Taro.showToast({ title: '数据解析失败', icon: 'none' })
+      setTimeout(() => Taro.navigateBack(), 1000)
     }
   })
 
   async function handleSubmit() {
+    if (!babyId) {
+      Taro.showToast({ title: '宝宝信息加载失败', icon: 'none' })
+      return
+    }
     if (!babyName.trim()) {
       Taro.showToast({ title: '请输入宝宝姓名', icon: 'none' })
       return
@@ -53,7 +61,7 @@ export default function EditBabyPage() {
 
     setLoading(true)
     try {
-      await updateBaby(babyId!, {
+      await updateBaby(babyId, {
         name: babyName,
         gender,
         birthday: new Date(birthday).getTime(),

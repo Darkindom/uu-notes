@@ -319,7 +319,14 @@ export default function BabySelectorPage() {
       return
     }
 
-    Taro.navigateTo({ url: `/pages/edit-baby/index?id=${baby.id}` })
+    // 将宝宝信息通过 URL 参数传递，避免重复请求
+    const babyData = encodeURIComponent(JSON.stringify({
+      id: baby.id,
+      name: baby.name,
+      gender: baby.gender,
+      birthday: baby.birthday,
+    }))
+    Taro.navigateTo({ url: `/pages/edit-baby/index?data=${babyData}` })
   }
 
   async function handleDelete(baby: Baby, e: any) {
