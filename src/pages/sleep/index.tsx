@@ -1,10 +1,10 @@
 import { View, Text, Input, Picker, Button } from '@tarojs/components'
 import Taro, { useLoad, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
-// 已迁移到自建后端 API
+import dayjs from 'dayjs'
 import { createRecord, updateRecord, getRecentRecordsByCategory, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
-// import { addRecord, getRecentByCategory, type Record as DbRecord } from '../../utils/db' // 云开发已废弃
 import { getCurrentDateTime, dateTimeToTimestamp, formatRecordSummary, timestampToDateTime } from '../../utils/format'
+import Calendar from '../../components/Calendar'
 import './index.less'
 
 export default function SleepPage() {
@@ -19,6 +19,7 @@ export default function SleepPage() {
   const [minutes, setMinutes] = useState('')
   const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
   const [loading, setLoading] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(false)
 
   useLoad(async () => {
     try {
@@ -117,6 +118,19 @@ export default function SleepPage() {
     setMinutes(String(min % 60))
   }
 
+  function handleOpenCalendar() {
+    setShowCalendar(true)
+  }
+
+  function handleConfirmDate(selectedDate: Date) {
+    setDate(dayjs(selectedDate).format('YYYY-MM-DD'))
+    setShowCalendar(false)
+  }
+
+  function handleCancelCalendar() {
+    setShowCalendar(false)
+  }
+
   return (
     <View className='page-container sleep-page'>
       <View className='main-card'>
@@ -124,9 +138,7 @@ export default function SleepPage() {
         <View className='section section-inline'>
           <Text className='field-label'>时间</Text>
           <View className='time-row'>
-            <Picker mode='date' value={date} onChange={(e) => setDate(e.detail.value)}>
-              <View className='picker-display'>{date}</View>
-            </Picker>
+            <View className='picker-display' onClick={handleOpenCalendar}>{date}</View>
             <Picker mode='time' value={time} onChange={(e) => setTime(e.detail.value)}>
               <View className='picker-display'>{time}</View>
             </Picker>
@@ -190,6 +202,14 @@ export default function SleepPage() {
       <Button className='submit-btn' onClick={handleSubmit} loading={loading} disabled={loading}>
         {isEdit ? '更新' : '记录'}
       </Button>
+
+      <Calendar
+        visible={showCalendar}
+        value={dayjs(date).toDate()}
+        maxDate={new Date()}
+        onConfirm={handleConfirmDate}
+        onCancel={handleCancelCalendar}
+      />
     </View>
   )
 }

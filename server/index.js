@@ -115,30 +115,44 @@ const verifyToken = (req, res, next) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { code } = req.body
-
-    // 调用微信 API 获取 openId
-    const APPID = process.env.WECHAT_APPID
-    const SECRET = process.env.WECHAT_SECRET
-
-    if (!APPID || !SECRET) {
-      console.error('缺少微信配置: WECHAT_APPID 或 WECHAT_SECRET')
+    
+    let openId
+    
+    // 开发环境：使用环境变量中的测试 openId
+    if (process.env.NODE_ENV === 'development' && process.env.DEV_OPENID) {
+      console.log('🔧 开发模式：使用测试 openId')
+      openId = process.env.DEV_OPENID
+    } else if (!process.env.WECHAT_APPID) {
+      // 没有配置微信 APPID，但也没有测试 openId
+      console.error('开发环境需要配置 DEV_OPENID')
       return res.status(500).json({ error: '服务器配置错误' })
+    } else {
+      // 生产环境：调用微信 API 获取 openId
+      const APPID = process.env.WECHAT_APPID
+      const SECRET = process.env.WECHAT_SECRET
+
+      if (!APPID || !SECRET) {
+        console.error('缺少微信配置: WECHAT_APPID 或 WECHAT_SECRET')
+        return res.status(500).json({ error: '服务器配置错误' })
+      }
+
+      const wxRes = await fetch(
+        `https://api.weixin.qq.com/sns/jscode2session?appid=${APPID}&secret=${SECRET}&js_code=${code}&grant_type=authorization_code`
+      )
+      const wxData = await wxRes.json()
+
+      if (wxData.errcode) {
+        console.error('微信登录失败:', wxData)
+        return res.status(400).json({ error: wxData.errmsg || '微信登录失败' })
+      }
+
+      openId = wxData.openid
     }
-
-    const wxRes = await fetch(
-      `https://api.weixin.qq.com/sns/jscode2session?appid=${APPID}&secret=${SECRET}&js_code=${code}&grant_type=authorization_code`
-    )
-    const wxData = await wxRes.json()
-
-    if (wxData.errcode) {
-      console.error('微信登录失败:', wxData)
-      return res.status(400).json({ error: wxData.errmsg || '微信登录失败' })
-    }
-
-    const openId = wxData.openid
 
     // 查找或创建用户
     let user = db.prepare('SELECT * FROM users WHERE openId = ?').get(openId)
+    
+    console.log('查询到的用户:', user)
 
     if (!user) {
       const now = Date.now()
@@ -163,8 +177,8 @@ app.post('/api/auth/login', async (req, res) => {
     const token = jwt.sign({ userId: user.id, openId: user.openId }, process.env.JWT_SECRET, {
       expiresIn: '30d',
     })
-
-    res.json({
+    
+    const responseData = {
       success: true,
       data: {
         token,
@@ -173,7 +187,11 @@ app.post('/api/auth/login', async (req, res) => {
           babyIds: user.babyIds ? JSON.parse(user.babyIds) : [],
         },
       },
-    })
+    }
+    
+    console.log('返回的用户数据:', responseData.data.user)
+
+    res.json(responseData)
   } catch (error) {
     console.error('登录失败:', error)
     res.status(500).json({ error: '登录失败' })

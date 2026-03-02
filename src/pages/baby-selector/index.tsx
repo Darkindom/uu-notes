@@ -1,6 +1,7 @@
 import { View, Text, Button } from '@tarojs/components'
 import Taro, { useLoad, useShareAppMessage, useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
+import dayjs from 'dayjs'
 import {
   getBabies,
   switchBaby,
@@ -10,6 +11,7 @@ import {
   type Baby,
 } from '../../utils/api'
 import { clearIndexCache } from '../../utils/cache'
+import Calendar from '../../components/Calendar'
 import './index.less'
 
 interface TodayStats {
@@ -32,6 +34,8 @@ export default function BabySelectorPage() {
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [selectedBaby, setSelectedBaby] = useState<Baby | null>(null)
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [showCalendar, setShowCalendar] = useState(false)
 
   useLoad(async () => {
     await loadBabies()
@@ -40,7 +44,7 @@ export default function BabySelectorPage() {
   useDidShow(async () => {
     // 每次显示页面时刷新统计数据
     if (currentBabyId) {
-      await loadTodayStats(currentBabyId)
+      await loadTodayStats(currentBabyId, selectedDate)
     }
   })
 
@@ -60,15 +64,18 @@ export default function BabySelectorPage() {
   async function loadBabies() {
     setLoading(true)
     try {
+      console.log('loadBabies 开始')
       const [babyList, user] = await Promise.all([getBabies(), getCurrentUser()])
+      console.log('获取到宝宝列表:', babyList, '用户:', user)
       setBabies(babyList)
       setCurrentBabyId(user?.currentBabyId)
       setCurrentUserId(user?.id)
 
       // 加载当前宝宝的今日统计
       if (user?.currentBabyId) {
-        await loadTodayStats(user.currentBabyId)
+        await loadTodayStats(user.currentBabyId, selectedDate)
       }
+      console.log('loadBabies 完成')
     } catch (error) {
       console.error('加载宝宝列表失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
@@ -77,14 +84,15 @@ export default function BabySelectorPage() {
     }
   }
 
-  async function loadTodayStats(babyId: number) {
+  async function loadTodayStats(babyId: number, date: Date = new Date()) {
     try {
-      const startOfDay = new Date()
+      console.log('loadTodayStats 开始', babyId, date)
+      const startOfDay = new Date(date)
       startOfDay.setHours(0, 0, 0, 0)
-      const endOfDay = new Date()
+      const endOfDay = new Date(date)
       endOfDay.setHours(23, 59, 59, 999)
 
-      // 获取今天的所有记录
+      // 获取当天的所有记录
       const todayResponse = await getRecords({
         babyId,
         limit: 1000,
@@ -94,7 +102,7 @@ export default function BabySelectorPage() {
       })
       const todayRecords = todayResponse.records
 
-      // 获取昨天最后的护具记录，检查是否有未脱下的
+      // 获取前一天最后的护具记录，检查是否有未脱下的
       const yesterdayStart = new Date(startOfDay)
       yesterdayStart.setDate(yesterdayStart.getDate() - 1)
       const yesterdayEnd = new Date(startOfDay)
@@ -252,8 +260,11 @@ export default function BabySelectorPage() {
       stats.gearHours = Math.round((totalGearMinutes / 60) * 10) / 10 // 保留1位小数
 
       setTodayStats(stats)
+      console.log('loadTodayStats 完成', stats)
     } catch (error) {
       console.error('加载今日统计失败:', error)
+      // 即使加载统计失败也不影响页面显示
+      setTodayStats(null)
     }
   }
 
@@ -350,9 +361,9 @@ export default function BabySelectorPage() {
   }
 
   function getAge(birthday: number): string {
-    const now = Date.now()
-    const diff = now - birthday
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const now = dayjs()
+    const birthDate = dayjs(birthday)
+    const days = now.diff(birthDate, 'day')
 
     if (days < 30) {
       return `${days}天`
@@ -370,6 +381,25 @@ export default function BabySelectorPage() {
     e.stopPropagation()
     setSelectedBaby(baby)
     setShowMembersModal(true)
+  }
+
+  // 打开日历
+  function handleOpenCalendar() {
+    setShowCalendar(true)
+  }
+
+  // 确认选择日期
+  function handleConfirmDate(date: Date) {
+    setSelectedDate(date)
+    setShowCalendar(false)
+    if (currentBabyId) {
+      loadTodayStats(currentBabyId, date)
+    }
+  }
+
+  // 取消选择日期
+  function handleCancelCalendar() {
+    setShowCalendar(false)
   }
 
   return (
@@ -432,8 +462,13 @@ export default function BabySelectorPage() {
           {todayStats && currentBabyId && (
             <View className='today-stats-section'>
               <View className='stats-header'>
-                <Text className='stats-title'>今日概况</Text>
-                <Text className='stats-date'>{new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</Text>
+                <Text className='stats-title'>
+                  {dayjs(selectedDate).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD') ? '今日概况' : '当日概况'}
+                </Text>
+                <View className='stats-date-picker' onClick={handleOpenCalendar}>
+                  <Text className='stats-date'>{dayjs(selectedDate).format('YYYY.MM.DD')}</Text>
+                  <Text className='date-arrow'>▼</Text>
+                </View>
               </View>
               <View className='stats-content'>
                 {/* 吃 */}
@@ -499,7 +534,7 @@ export default function BabySelectorPage() {
                   todayStats.tonic === 0 &&
                   todayStats.cry === 0 &&
                   todayStats.gearHours === 0 && (
-                    <Text className='stat-empty'>今天还没有任何记录</Text>
+                    <Text className='stat-empty'>当天没有任何记录</Text>
                   )}
               </View>
             </View>
@@ -545,6 +580,17 @@ export default function BabySelectorPage() {
             </View>
           </View>
         </View>
+      )}
+
+      {/* 日历组件 */}
+      {showCalendar && (
+        <Calendar
+          visible={showCalendar}
+          value={selectedDate}
+          maxDate={new Date()}
+          onConfirm={handleConfirmDate}
+          onCancel={handleCancelCalendar}
+        />
       )}
     </View>
   )

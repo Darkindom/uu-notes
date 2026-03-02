@@ -7,8 +7,15 @@ import './index.less'
 export default function PrelandingPage() {
   useLoad(async () => {
     try {
+      // 开发环境：清除所有缓存
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🧹 开发模式：清除所有缓存')
+        Taro.clearStorageSync()
+      }
+      
       // 1. 检查本地缓存
       const cache = getIndexCache()
+      console.log('📦 本地缓存:', cache)
       if (cache?.name) {
         // 有缓存，直接进入首页
         Taro.switchTab({ url: '/pages/home/index' })
@@ -16,7 +23,10 @@ export default function PrelandingPage() {
       }
 
       // 2. 没有缓存，检查用户登录状态
+      console.log('🔐 开始登录...')
       const user = await login()
+      console.log('当前登录用户:', user)
+      console.log('用户 openId:', user?.openId)
 
       // 3. 根据用户状态路由
       if (!user) {

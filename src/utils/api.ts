@@ -5,8 +5,8 @@ const ENV = process.env.TARO_APP_ENV || 'dev'
 
 // API 配置 - 根据环境选择不同的 API 地址
 const API_CONFIG = {
-  dev: 'https://dksiuu.top/api',     // 开发环境（当前使用）
-  test: 'https://dksiuu.top/api',    // 测试环境（可以使用相同或不同的地址）
+  dev: 'http://localhost:1717/api',     // 开发环境（本地服务器）
+  test: 'https://dksiuu.top/api',    // 测试环境
   prod: 'https://dksiuu.top/api',    // 生产环境（正式发布使用）
 }
 

@@ -1,5 +1,5 @@
 export default {
-  navigationBarTitleText: '猪宝日常',
+  navigationBarTitleText: 'UU日记',
   navigationBarBackgroundColor: '#ffffff',
-  navigationBarTextStyle: 'black'
+  navigationBarTextStyle: 'black',
 }
