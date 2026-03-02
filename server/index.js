@@ -171,12 +171,16 @@ function generateCacheKey(prefix, params) {
 // 清除相关缓存
 function clearRecordsCacheForBaby(babyId) {
   const keys = cache.keys()
+  const cleared = []
   keys.forEach(key => {
-    if (key.startsWith('records:') && key.includes(`"babyId":${babyId}`)) {
+    // 同时匹配数字和字符串格式的 babyId
+    if (key.startsWith('records:') && 
+        (key.includes(`"babyId":${babyId}`) || key.includes(`"babyId":"${babyId}"`))) {
       cache.del(key)
+      cleared.push(key)
     }
   })
-  log('INFO', `清除宝宝 ${babyId} 的记录缓存`)
+  log('INFO', `清除宝宝 ${babyId} 的记录缓存`, { cleared, count: cleared.length })
 }
 
 // 中间件
@@ -621,15 +625,18 @@ app.get('/api/records', verifyToken, (req, res) => {
   try {
     const { babyId, category, limit = 20, offset = 0, startDate, endDate } = req.query
 
+    // 标准化参数（确保类型一致）
+    const normalizedParams = {
+      babyId: babyId ? parseInt(babyId) : undefined,
+      category,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      startDate: startDate ? parseInt(startDate) : undefined,
+      endDate: endDate ? parseInt(endDate) : undefined,
+    }
+
     // 生成缓存键
-    const cacheKey = generateCacheKey('records', { 
-      babyId, 
-      category, 
-      limit, 
-      offset, 
-      startDate, 
-      endDate 
-    })
+    const cacheKey = generateCacheKey('records', normalizedParams)
 
     // 尝试从缓存获取
     const cachedData = cache.get(cacheKey)
@@ -646,9 +653,9 @@ app.get('/api/records', verifyToken, (req, res) => {
     `
     const params = []
 
-    if (babyId) {
+    if (normalizedParams.babyId) {
       query += ' AND r.babyId = ?'
-      params.push(parseInt(babyId))
+      params.push(normalizedParams.babyId)
     }
 
     if (category) {
@@ -657,19 +664,19 @@ app.get('/api/records', verifyToken, (req, res) => {
     }
 
     // 日期范围过滤
-    if (startDate) {
+    if (normalizedParams.startDate) {
       query += ' AND r.startTime >= ?'
-      params.push(parseInt(startDate))
+      params.push(normalizedParams.startDate)
     }
 
-    if (endDate) {
+    if (normalizedParams.endDate) {
       query += ' AND r.startTime <= ?'
-      params.push(parseInt(endDate))
+      params.push(normalizedParams.endDate)
     }
 
     query += ' ORDER BY r.startTime DESC LIMIT ? OFFSET ?'
-    params.push(parseInt(limit))
-    params.push(parseInt(offset))
+    params.push(normalizedParams.limit)
+    params.push(normalizedParams.offset)
 
     const records = db.prepare(query).all(...params)
 
@@ -677,9 +684,9 @@ app.get('/api/records', verifyToken, (req, res) => {
     let countQuery = 'SELECT COUNT(*) as total FROM records r WHERE 1=1'
     const countParams = []
     
-    if (babyId) {
+    if (normalizedParams.babyId) {
       countQuery += ' AND r.babyId = ?'
-      countParams.push(parseInt(babyId))
+      countParams.push(normalizedParams.babyId)
     }
     
     if (category) {
@@ -688,14 +695,14 @@ app.get('/api/records', verifyToken, (req, res) => {
     }
 
     // 日期范围过滤（计数时也需要）
-    if (startDate) {
+    if (normalizedParams.startDate) {
       countQuery += ' AND r.startTime >= ?'
-      countParams.push(parseInt(startDate))
+      countParams.push(normalizedParams.startDate)
     }
 
-    if (endDate) {
+    if (normalizedParams.endDate) {
       countQuery += ' AND r.startTime <= ?'
-      countParams.push(parseInt(endDate))
+      countParams.push(normalizedParams.endDate)
     }
     
     const { total } = db.prepare(countQuery).get(...countParams)
@@ -709,9 +716,9 @@ app.get('/api/records', verifyToken, (req, res) => {
       })),
       pagination: {
         total,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        hasMore: parseInt(offset) + records.length < total,
+        limit: normalizedParams.limit,
+        offset: normalizedParams.offset,
+        hasMore: normalizedParams.offset + records.length < total,
       },
     }
 
@@ -846,6 +853,44 @@ app.delete('/api/records/:id', verifyToken, (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() })
+})
+
+// ============ 缓存管理接口（调试用）============
+
+// 清除所有缓存
+app.post('/api/admin/cache/clear', verifyToken, (req, res) => {
+  try {
+    const keys = cache.keys()
+    cache.flushAll()
+    log('INFO', '手动清除所有缓存', { clearedCount: keys.length })
+    res.json({ 
+      success: true, 
+      message: `已清除 ${keys.length} 个缓存项`,
+      keys 
+    })
+  } catch (error) {
+    log('ERROR', '清除缓存失败', { error: error.message })
+    res.status(500).json({ error: '清除缓存失败' })
+  }
+})
+
+// 查看缓存统计
+app.get('/api/admin/cache/stats', verifyToken, (req, res) => {
+  try {
+    const keys = cache.keys()
+    const stats = cache.getStats()
+    res.json({ 
+      success: true, 
+      data: {
+        keys,
+        count: keys.length,
+        stats
+      }
+    })
+  } catch (error) {
+    log('ERROR', '获取缓存统计失败', { error: error.message })
+    res.status(500).json({ error: '获取缓存统计失败' })
+  }
 })
 
 // 启动服务器
