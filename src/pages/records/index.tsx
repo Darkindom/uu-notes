@@ -3,11 +3,7 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import dayjs from 'dayjs'
 import { getRecords, deleteRecord, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
-import {
-  formatTimestamp,
-  formatRecordSummary,
-  CATEGORY_LABELS,
-} from '../../utils/format'
+import { formatTimestamp, formatRecordSummary, CATEGORY_LABELS } from '../../utils/format'
 import Calendar from '../../components/Calendar'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import './index.less'
@@ -31,7 +27,7 @@ function groupByDate(records: ApiRecord[]) {
   const groups: { date: string; records: ApiRecord[] }[] = []
   const map: Record<string, ApiRecord[]> = {}
 
-  records.forEach(r => {
+  records.forEach((r) => {
     const d = new Date(r.startTime)
     const key = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
     if (!map[key]) {
@@ -51,7 +47,9 @@ export default function RecordsPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+      now.getDate(),
+    ).padStart(2, '0')}`
   })
   const [showCalendar, setShowCalendar] = useState(false)
 
@@ -73,7 +71,7 @@ export default function RecordsPage() {
     } else {
       setRefreshing(true)
     }
-    
+
     try {
       const baby = await getCurrentBaby()
       if (!baby) {
@@ -113,13 +111,13 @@ export default function RecordsPage() {
       confirmText: '删除',
       confirmColor: '#ff4444',
     })
-    
+
     if (res.confirm) {
       try {
         await deleteRecord(id)
         Taro.showToast({ title: '删除成功', icon: 'success' })
         // 从列表中移除该记录
-        const newRecords = allRecords.filter(r => r.id !== id)
+        const newRecords = allRecords.filter((r) => r.id !== id)
         setAllRecords(newRecords)
         // 缓存会在 deleteRecord 中自动清除
       } catch (error) {
@@ -136,7 +134,7 @@ export default function RecordsPage() {
       shit: '/pages/shit/index',
       other: '/pages/other/index',
     }
-    
+
     const path = pathMap[record.category] || '/pages/home/index'
     Taro.setStorageSync('editRecord', record)
     Taro.navigateTo({
@@ -162,27 +160,46 @@ export default function RecordsPage() {
   }
 
   // 前端筛选：根据类型过滤记录
-  const filteredRecords = categoryFilter 
-    ? allRecords.filter(r => r.category === categoryFilter)
+  const filteredRecords = categoryFilter
+    ? allRecords.filter((r) => r.category === categoryFilter)
     : allRecords
 
   const groups = groupByDate(filteredRecords)
+
+  // 判断当前选择的日期是否是今天
+  const isToday = selectedDate === dayjs().format('YYYY-MM-DD')
+
+  // 回到今天
+  const handleBackToToday = () => {
+    setSelectedDate(dayjs().format('YYYY-MM-DD'))
+  }
 
   return (
     <View className='records-page'>
       {/* 筛选栏 */}
       <View className='filter-bar'>
-        <View className='filter-section'>
+        <View className='filter-section filter-section-row'>
           <Text className='filter-label'>日期</Text>
           <View className='date-picker-btn' onClick={handleOpenCalendar}>
             <Text>{selectedDate}</Text>
           </View>
+          {!isToday && (
+            <View className='back-to-today-btn' onClick={handleBackToToday}>
+              <Text>回到今天</Text>
+            </View>
+          )}
         </View>
 
         <View className='filter-section'>
-          <Text className='filter-label'>类型</Text>
+          <View className='filter-row-with-count'>
+            <Text className='filter-label'>类型</Text>
+            <View className='count-and-loading'>
+              {refreshing && <LoadingSpinner size='small' color='#999' />}
+              <Text className='total-count'>{filteredRecords.length} 条</Text>
+            </View>
+          </View>
           <View className='category-filters'>
-            {CATEGORY_FILTERS.map(cat => (
+            {CATEGORY_FILTERS.map((cat) => (
               <View
                 key={cat.value}
                 className={`filter-chip ${categoryFilter === cat.value ? 'active' : ''}`}
@@ -194,6 +211,9 @@ export default function RecordsPage() {
           </View>
         </View>
       </View>
+
+      {/* 占位元素，防止内容被固定栏遮挡 */}
+      <View className='filter-placeholder' />
 
       <ScrollView className='records-scroll' scrollY>
         {loading ? (
@@ -208,17 +228,9 @@ export default function RecordsPage() {
           </View>
         ) : (
           <>
-            {groups.map(group => (
+            {groups.map((group) => (
               <View key={group.date} className='date-group'>
-                <View className='date-header'>
-                  <View className='date-header-left'>
-                    {refreshing && <LoadingSpinner size='small' color='#999' />}
-                    <Text className='date-text'>{group.date}</Text>
-                  </View>
-                  <Text className='date-count'>{group.records.length} 条</Text>
-                </View>
-
-                {group.records.map(record => (
+                {group.records.map((record) => (
                   <View key={record.id} className='record-card'>
                     <View
                       className='category-badge'
@@ -232,7 +244,9 @@ export default function RecordsPage() {
                     <View className='record-body'>
                       <Text className='record-summary'>{formatRecordSummary(record)}</Text>
                       <Text className='record-time'>{formatTimestamp(record.startTime)}</Text>
-                      <Text className='record-reporter'>记录人 {record.reporterRole || '家长'}</Text>
+                      <Text className='record-reporter'>
+                        记录人 {record.reporterRole || '家长'}
+                      </Text>
                     </View>
                     <View className='record-actions'>
                       <View className='edit-btn' onClick={() => handleEdit(record)}>
