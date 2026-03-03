@@ -18,7 +18,7 @@
 }
 
 .filter-placeholder {
-  height: 390px; /* 根据筛选栏实际高度调整 */
+  height: 380px; /* 根据筛选栏实际高度调整 */
   flex-shrink: 0;
 }
 
@@ -105,18 +105,29 @@
 
 .category-filters {
   display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+
+  /* 隐藏滚动条 */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  scrollbar-width: none;
 }
 
 .filter-chip {
-  padding: 18px 32px;
+  padding: 16px 28px;
   border-radius: 28px;
   background: #f5f5f5;
-  font-size: 48px;
+  font-size: 44px;
   color: #666;
   transition: all 0.2s;
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .filter-chip.active {
