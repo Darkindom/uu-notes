@@ -9,6 +9,7 @@ import {
   CATEGORY_LABELS,
 } from '../../utils/format'
 import Calendar from '../../components/Calendar'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './index.less'
 
 const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
@@ -25,44 +26,6 @@ const CATEGORY_FILTERS = [
   { label: '拉', value: 'shit' },
   { label: '其他', value: 'other' },
 ]
-
-// 缓存键前缀
-const CACHE_KEY_PREFIX = 'records_cache_'
-
-// 获取缓存键
-function getCacheKey(babyId: number, category: string, date: string) {
-  return `${CACHE_KEY_PREFIX}${babyId}_${category}_${date}`
-}
-
-// 保存缓存
-function saveCache(babyId: number, category: string, date: string, records: ApiRecord[]) {
-  const key = getCacheKey(babyId, category, date)
-  try {
-    Taro.setStorageSync(key, {
-      records,
-      timestamp: Date.now(),
-    })
-  } catch (error) {
-    console.error('保存缓存失败:', error)
-  }
-}
-
-// 读取缓存
-function loadCache(babyId: number, category: string, date: string): ApiRecord[] | null {
-  const key = getCacheKey(babyId, category, date)
-  try {
-    const cache = Taro.getStorageSync(key)
-    if (cache && cache.records) {
-      // 缓存有效期 5 分钟
-      if (Date.now() - cache.timestamp < 5 * 60 * 1000) {
-        return cache.records
-      }
-    }
-  } catch (error) {
-    console.error('读取缓存失败:', error)
-  }
-  return null
-}
 
 function groupByDate(records: ApiRecord[]) {
   const groups: { date: string; records: ApiRecord[] }[] = []
@@ -84,6 +47,7 @@ function groupByDate(records: ApiRecord[]) {
 export default function RecordsPage() {
   const [allRecords, setAllRecords] = useState<ApiRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false) // 后台刷新状态
   const [categoryFilter, setCategoryFilter] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date()
@@ -99,10 +63,17 @@ export default function RecordsPage() {
   // 当 selectedDate 改变时，重新加载记录
   useEffect(() => {
     loadRecords()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate])
 
   async function loadRecords() {
-    setLoading(true)
+    const isInitialLoad = allRecords.length === 0
+    if (isInitialLoad) {
+      setLoading(true)
+    } else {
+      setRefreshing(true)
+    }
+    
     try {
       const baby = await getCurrentBaby()
       if (!baby) {
@@ -116,14 +87,7 @@ export default function RecordsPage() {
       const endOfDay = new Date(selectedDate)
       endOfDay.setHours(23, 59, 59, 999)
 
-      // 先尝试从缓存加载
-      const cachedRecords = loadCache(baby.id, '', selectedDate)
-      if (cachedRecords) {
-        setAllRecords(cachedRecords)
-        setLoading(false)
-      }
-
-      // 异步请求最新数据（不传 category，获取所有类型）
+      // 请求数据（会自动使用缓存）
       const response = await getRecords({
         babyId: baby.id,
         limit: 1000,
@@ -133,13 +97,12 @@ export default function RecordsPage() {
       })
 
       setAllRecords(response.records)
-      // 保存到缓存
-      saveCache(baby.id, '', selectedDate, response.records)
     } catch (error) {
       console.error('加载记录失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -158,11 +121,7 @@ export default function RecordsPage() {
         // 从列表中移除该记录
         const newRecords = allRecords.filter(r => r.id !== id)
         setAllRecords(newRecords)
-        // 更新缓存
-        const baby = await getCurrentBaby()
-        if (baby) {
-          saveCache(baby.id, '', selectedDate, newRecords)
-        }
+        // 缓存会在 deleteRecord 中自动清除
       } catch (error) {
         console.error('删除失败:', error)
         Taro.showToast({ title: '删除失败', icon: 'none' })
@@ -252,7 +211,10 @@ export default function RecordsPage() {
             {groups.map(group => (
               <View key={group.date} className='date-group'>
                 <View className='date-header'>
-                  <Text className='date-text'>{group.date}</Text>
+                  <View className='date-header-left'>
+                    {refreshing && <LoadingSpinner size='small' color='#999' />}
+                    <Text className='date-text'>{group.date}</Text>
+                  </View>
                   <Text className='date-count'>{group.records.length} 条</Text>
                 </View>
 

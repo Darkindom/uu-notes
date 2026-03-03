@@ -1,4 +1,15 @@
 import Taro from '@tarojs/taro'
+import {
+  getCachedCurrentUser,
+  setCachedCurrentUser,
+  clearCachedCurrentUser,
+  getCachedBabies,
+  setCachedBabies,
+  clearCachedBabies,
+  getCachedRecords,
+  setCachedRecords,
+  clearAllCachedRecords,
+} from './cache'
 
 // 环境配置
 const ENV = process.env.TARO_APP_ENV || 'prod' // 默认使用生产环境
@@ -147,16 +158,32 @@ export interface User {
   updatedAt: number
 }
 
-export const getCurrentUser = (): Promise<User> => {
-  return request<User>({ url: '/user/current' })
+export const getCurrentUser = async (): Promise<User> => {
+  const cached = getCachedCurrentUser()
+  
+  // 有缓存立即返回，同时在后台刷新
+  if (cached) {
+    request<User>({ url: '/user/current' })
+      .then(setCachedCurrentUser)
+      .catch(err => console.error('后台更新用户数据失败:', err))
+    return cached
+  }
+  
+  // 无缓存等待请求
+  const user = await request<User>({ url: '/user/current' })
+  setCachedCurrentUser(user)
+  return user
 }
 
-export const updateUser = (data: {
+export const updateUser = async (data: {
   nickname?: string
   avatarUrl?: string
   currentBabyId?: number
 }): Promise<void> => {
-  return request({ url: '/user/current', method: 'PUT', data })
+  await request({ url: '/user/current', method: 'PUT', data })
+  
+  // 更新用户信息后，清除用户缓存
+  clearCachedCurrentUser()
 }
 
 // ============ 宝宝相关 ============
@@ -180,21 +207,40 @@ export interface Baby {
   updatedAt: number
 }
 
-export const getBabies = (): Promise<Baby[]> => {
-  return request<Baby[]>({ url: '/babies' })
+export const getBabies = async (): Promise<Baby[]> => {
+  const cached = getCachedBabies()
+  
+  // 有缓存立即返回，同时在后台刷新
+  if (cached) {
+    request<Baby[]>({ url: '/babies' })
+      .then(setCachedBabies)
+      .catch(err => console.error('后台更新宝宝列表失败:', err))
+    return cached
+  }
+  
+  // 无缓存等待请求
+  const babies = await request<Baby[]>({ url: '/babies' })
+  setCachedBabies(babies)
+  return babies
 }
 
-export const createBaby = (data: {
+export const createBaby = async (data: {
   name: string
   gender: string
   birthday: number
   avatarUrl?: string
   role?: string
 }): Promise<Baby> => {
-  return request<Baby>({ url: '/babies', method: 'POST', data })
+  const result = await request<Baby>({ url: '/babies', method: 'POST', data })
+  
+  // 创建宝宝后，清除宝宝列表缓存
+  clearCachedBabies()
+  clearCachedCurrentUser()
+  
+  return result
 }
 
-export const updateBaby = (
+export const updateBaby = async (
   id: number,
   data: {
     name: string
@@ -203,11 +249,19 @@ export const updateBaby = (
     avatarUrl?: string
   },
 ): Promise<void> => {
-  return request({ url: `/babies/${id}`, method: 'PUT', data })
+  await request({ url: `/babies/${id}`, method: 'PUT', data })
+  
+  // 更新宝宝后，清除宝宝列表缓存
+  clearCachedBabies()
 }
 
-export const deleteBaby = (id: number): Promise<void> => {
-  return request({ url: `/babies/${id}`, method: 'DELETE' })
+export const deleteBaby = async (id: number): Promise<void> => {
+  await request({ url: `/babies/${id}`, method: 'DELETE' })
+  
+  // 删除宝宝后，清除相关缓存
+  clearCachedBabies()
+  clearCachedCurrentUser()
+  clearAllCachedRecords(id)
 }
 
 // ============ 记录相关 ============
@@ -238,30 +292,64 @@ export interface RecordsResponse {
   }
 }
 
-export const getRecords = (params: {
+export const getRecords = async (params: {
   babyId?: number
   category?: string
   limit?: number
   offset?: number
-  startDate?: number // 开始时间戳
-  endDate?: number // 结束时间戳
+  startDate?: number
+  endDate?: number
 }): Promise<RecordsResponse> => {
   const query = Object.entries(params)
     .filter(([_, v]) => v !== undefined)
     .map(([k, v]) => `${k}=${v}`)
     .join('&')
 
-  return request<any>({ url: `/records${query ? '?' + query : ''}` }).then((data) => ({
+  // 如果有 babyId 和日期范围，尝试使用缓存
+  if (params.babyId && params.startDate && params.endDate) {
+    const startDate = new Date(params.startDate)
+    const dateKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+    
+    const cachedRecords = getCachedRecords(params.babyId, dateKey, params.category || '')
+    
+    // 有缓存立即返回，同时在后台刷新
+    if (cachedRecords) {
+      request<any>({ url: `/records${query ? '?' + query : ''}` })
+        .then((data) => {
+          const records = data.data || data
+          setCachedRecords(params.babyId!, dateKey, params.category || '', records)
+        })
+        .catch(err => console.error('后台更新记录列表失败:', err))
+      
+      return {
+        records: cachedRecords,
+        pagination: { total: cachedRecords.length, limit: params.limit || 20, offset: 0, hasMore: false },
+      }
+    }
+    
+    // 无缓存等待请求
+    const data = await request<any>({ url: `/records${query ? '?' + query : ''}` })
+    const records = data.data || data
+    setCachedRecords(params.babyId, dateKey, params.category || '', records)
+    return {
+      records,
+      pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false },
+    }
+  }
+  
+  // 没有缓存条件，直接请求
+  const data = await request<any>({ url: `/records${query ? '?' + query : ''}` })
+  return {
     records: data.data || data,
     pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false },
-  }))
+  }
 }
 
 export const getRecord = (id: number): Promise<Record> => {
   return request<Record>({ url: `/records/${id}` })
 }
 
-export const createRecord = (data: {
+export const createRecord = async (data: {
   babyId: number
   category: string
   subCategory?: string
@@ -271,10 +359,15 @@ export const createRecord = (data: {
   extra?: any
   note?: string
 }): Promise<Record> => {
-  return request<Record>({ url: '/records', method: 'POST', data })
+  const result = await request<Record>({ url: '/records', method: 'POST', data })
+  
+  // 成功后，清除相关日期的缓存以便重新加载
+  clearAllCachedRecords(data.babyId)
+  
+  return result
 }
 
-export const updateRecord = (
+export const updateRecord = async (
   id: number,
   data: {
     category: string
@@ -286,11 +379,17 @@ export const updateRecord = (
     note?: string
   },
 ): Promise<void> => {
-  return request({ url: `/records/${id}`, method: 'PUT', data })
+  await request({ url: `/records/${id}`, method: 'PUT', data })
+  
+  // 成功后，清除所有记录缓存以便重新加载
+  clearAllCachedRecords()
 }
 
-export const deleteRecord = (id: number): Promise<void> => {
-  return request({ url: `/records/${id}`, method: 'DELETE' })
+export const deleteRecord = async (id: number): Promise<void> => {
+  await request({ url: `/records/${id}`, method: 'DELETE' })
+  
+  // 成功后，清除所有记录缓存以便重新加载
+  clearAllCachedRecords()
 }
 
 // ============ 辅助函数 ============
