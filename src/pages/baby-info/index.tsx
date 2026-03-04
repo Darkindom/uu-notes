@@ -443,7 +443,7 @@ export default function BabySelectorPage() {
   }
 
   return (
-    <View className='page-container baby-selector-page'>
+    <View className='page-container baby-info-page'>
       {loading ? (
         <View className='loading-container'>
           <Text>加载中...</Text>

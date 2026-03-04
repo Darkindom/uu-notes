@@ -343,7 +343,7 @@ const baby = await getCurrentBaby()
 需要修改的文件：
 - `src/app.ts` - 登录逻辑
 - `src/pages/index/index.tsx`
-- `src/pages/baby-selector/index.tsx`
+- `src/pages/baby-info/index.tsx`
 - `src/pages/add-baby/index.tsx`
 - `src/pages/onboarding/index.tsx`
 - `src/pages/food/index.tsx`

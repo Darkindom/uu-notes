@@ -2,7 +2,7 @@ export default defineAppConfig({
   pages: [
     'pages/index/index',
     'pages/home/index',
-    'pages/baby-selector/index',
+    'pages/baby-info/index',
     'pages/records/index',
     'pages/onboarding/index',
     'pages/add-baby/index',
@@ -34,7 +34,7 @@ export default defineAppConfig({
         text: '记录',
       },
       {
-        pagePath: 'pages/baby-selector/index',
+        pagePath: 'pages/baby-info/index',
         text: '宝宝',
       },
     ],

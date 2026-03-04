@@ -330,7 +330,7 @@ const API_BASE = 'https://your-domain.com/api'  // 改成你的域名
 或者手动修改这些文件：
 - `src/app.ts`
 - `src/pages/index/index.tsx`
-- `src/pages/baby-selector/index.tsx`
+- `src/pages/baby-info/index.tsx`
 - `src/pages/add-baby/index.tsx`
 - `src/pages/onboarding/index.tsx`
 - `src/pages/food/index.tsx`
