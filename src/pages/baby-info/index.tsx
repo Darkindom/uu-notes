@@ -301,9 +301,9 @@ export default function BabySelectorPage() {
         food: stats.food,
         sleep: stats.sleep,
         shit: stats.shit,
-        todayRecords: todayRecords.length
+        todayRecords: todayRecords.length,
       })
-      
+
       setTodayStats(stats)
       console.log('✅ [loadTodayStats] 完成，设置统计数据')
     } catch (error) {
@@ -480,41 +480,50 @@ export default function BabySelectorPage() {
                   key={baby.id}
                   className={`baby-card ${baby.id === currentBabyId ? 'active' : ''}`}
                 >
-                  {/* 右上角操作按钮 */}
-                  <View className='baby-actions-top'>
-                    <View className='action-btn' onClick={(e) => handleViewMembers(baby, e)}>
-                      <Text className='action-text'>成员</Text>
+                  {/* 左上角当前标签，仅在宝宝数量 > 1 时显示 */}
+                  {babies.length > 1 && baby.id === currentBabyId && (
+                    <View className='current-badge'>
+                      <Text>当前</Text>
                     </View>
-                    <View className='action-btn' onClick={(e) => handleEdit(baby, e)}>
-                      <Text className='action-text'>编辑</Text>
-                    </View>
-                    <View className='action-btn delete' onClick={(e) => handleDelete(baby, e)}>
-                      <Text className='action-text'>删除</Text>
-                    </View>
-                  </View>
+                  )}
 
                   <View className='baby-content' onClick={() => handleSwitch(baby.id)}>
                     <View className='baby-avatar'>{baby.gender === 'male' ? '👦' : '👧'}</View>
                     <View className='baby-info'>
-                      <Text className='baby-name'>{baby.name}</Text>
-                      <Text className='baby-age'>{getAge(baby.birthday)}</Text>
-                      <Text className='baby-members'>{baby.memberIds?.length || 0} 位成员</Text>
-                    </View>
-                    {/* 当前标签在内容右侧 */}
-                    {baby.id === currentBabyId && (
-                      <View className='current-badge'>
-                        <Text>当前</Text>
+                      {/* 第一行：名字 + 成员按钮 */}
+                      <View className='baby-row'>
+                        <Text className='baby-name'>{baby.name}</Text>
+                        <View
+                          className='action-btn'
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewMembers(baby, e)
+                          }}
+                        >
+                          <Text className='action-text'>{baby.memberIds?.length || 0}位成员</Text>
+                        </View>
                       </View>
-                    )}
+                      {/* 第二行：年龄 + 编辑和删除按钮 */}
+                      <View className='baby-row'>
+                        <Text className='baby-age'>{getAge(baby.birthday)}</Text>
+                        <View className='actions-row' onClick={(e) => e.stopPropagation()}>
+                          <View className='action-btn' onClick={(e) => handleEdit(baby, e)}>
+                            <Text className='action-text'>编辑</Text>
+                          </View>
+                          <View
+                            className='action-btn delete'
+                            onClick={(e) => handleDelete(baby, e)}
+                          >
+                            <Text className='action-text'>删除</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
                   </View>
                 </View>
               ))}
             </View>
           )}
-
-          <Button className='add-baby-btn' onClick={handleAddBaby}>
-            + 添加新宝宝
-          </Button>
 
           {/* 今日统计 */}
           {currentBabyId && (
@@ -640,6 +649,11 @@ export default function BabySelectorPage() {
 
           <View className='coming-soon-section'>
             <Text className='coming-soon-text'>图表功能开发中...</Text>
+          </View>
+
+          {/* 添加新宝宝链接 */}
+          <View className='add-baby-link' onClick={handleAddBaby}>
+            <Text className='add-baby-link-text'>+ 添加新宝宝</Text>
           </View>
         </>
       )}
