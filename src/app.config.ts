@@ -15,7 +15,7 @@ export default defineAppConfig({
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#FF6B35',
-    navigationBarTitleText: '猪宝日常',
+    navigationBarTitleText: 'UU日记',
     navigationBarTextStyle: 'white',
     backgroundColor: '#FFF8F0',
   },

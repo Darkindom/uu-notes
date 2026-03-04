@@ -205,7 +205,15 @@ export default function BabySelectorPage() {
             type: r.extra?.gear_type === '带上' ? 'on' : 'off',
             time: r.startTime,
           }))
-          .sort((a, b) => a.time - b.time)
+          .sort((a, b) => {
+            if (a.time !== b.time) {
+              return a.time - b.time
+            }
+            // 时间相同时，"带上"(on)排在前面，"脱下"(off)排在后面
+            if (a.type === 'on' && b.type === 'off') return -1
+            if (a.type === 'off' && b.type === 'on') return 1
+            return 0
+          })
 
         // 判断昨天最后一次操作
         if (yesterdayGearEvents.length > 0) {
@@ -215,7 +223,16 @@ export default function BabySelectorPage() {
       }
 
       // 计算护具佩戴时长
-      gearEvents.sort((a, b) => a.time - b.time)
+      // 排序时，如果时间相同，"带上"排在"脱下"前面
+      gearEvents.sort((a, b) => {
+        if (a.time !== b.time) {
+          return a.time - b.time
+        }
+        // 时间相同时，"带上"(on)排在前面，"脱下"(off)排在后面
+        if (a.type === 'on' && b.type === 'off') return -1
+        if (a.type === 'off' && b.type === 'on') return 1
+        return 0
+      })
 
       // 过滤掉连续的相同操作，只保留状态变化的事件
       const filteredGearEvents: { type: 'on' | 'off'; time: number }[] = []

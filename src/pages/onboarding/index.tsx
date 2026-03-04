@@ -97,7 +97,7 @@ export default function OnboardingPage() {
         {step === 1 ? (
           <>
             <View className='welcome-section'>
-              <Text className='welcome-title'>👶 欢迎使用猪宝日常</Text>
+              <Text className='welcome-title'>👶 欢迎使用UU宝宝日记</Text>
               <Text className='welcome-subtitle'>记录宝宝成长的每一刻</Text>
             </View>
 

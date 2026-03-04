@@ -1,7 +1,7 @@
 {
   "miniprogramRoot": "dist/",
   "projectname": "uu-notes",
-  "description": "猪宝日常记录小程序",
+  "description": "UU宝宝日记小程序",
   "appid": "wx29312a9680a24b8b",
   "setting": {
     "urlCheck": false,
