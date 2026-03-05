@@ -13,7 +13,16 @@ import {
 import { clearIndexCache, getCachedRecords } from '../../utils/cache'
 import Calendar from '../../components/Calendar'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import WeeklyChart from '../../components/WeeklyChart'
 import './index.less'
+
+interface DayData {
+  date: string
+  milk: number
+  food: number
+  sleepMinutes: number
+  sleepCount: number
+}
 
 interface TodayStats {
   milk: number // 奶量 ml
@@ -38,15 +47,17 @@ export default function BabySelectorPage() {
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [showCalendar, setShowCalendar] = useState(false)
+  const [weeklyData, setWeeklyData] = useState<DayData[]>([])
+  const [chartLoading, setChartLoading] = useState(false)
 
   useLoad(async () => {
     await loadBabies()
   })
 
   useDidShow(async () => {
-    // 每次显示页面时刷新统计数据
     if (currentBabyId) {
       await loadTodayStats(currentBabyId, selectedDate)
+      await loadWeeklyData(currentBabyId)
     }
   })
 
@@ -66,18 +77,15 @@ export default function BabySelectorPage() {
   async function loadBabies() {
     setLoading(true)
     try {
-      console.log('loadBabies 开始')
       const [babyList, user] = await Promise.all([getBabies(), getCurrentUser()])
-      console.log('获取到宝宝列表:', babyList, '用户:', user)
       setBabies(babyList)
       setCurrentBabyId(user?.currentBabyId)
       setCurrentUserId(user?.id)
 
-      // 加载当前宝宝的今日统计
       if (user?.currentBabyId) {
         await loadTodayStats(user.currentBabyId, selectedDate)
+        await loadWeeklyData(user.currentBabyId)
       }
-      console.log('loadBabies 完成')
     } catch (error) {
       console.error('加载宝宝列表失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
@@ -89,10 +97,8 @@ export default function BabySelectorPage() {
   async function loadTodayStats(babyId: number, date: Date = new Date()) {
     try {
       setStatsLoading(true)
-      setTodayStats(null) // 开始加载时清空旧数据
-      console.log('🔄 [loadTodayStats] 开始加载，设置 statsLoading = true', babyId, date)
+      setTodayStats(null)
 
-      // 先检查是否有缓存
       const startOfDay = new Date(date)
       startOfDay.setHours(0, 0, 0, 0)
       const endOfDay = new Date(date)
@@ -102,11 +108,8 @@ export default function BabySelectorPage() {
         '0',
       )}-${String(startOfDay.getDate()).padStart(2, '0')}`
 
-      // 检查是否有缓存
       const cachedRecords = getCachedRecords(babyId, dateKey, '')
-      console.log('💾 [loadTodayStats] 缓存检查:', cachedRecords ? '有缓存' : '无缓存')
 
-      // 获取当天的所有记录（会自动使用缓存）
       const todayResponse = await getRecords({
         babyId,
         limit: 1000,
@@ -294,25 +297,200 @@ export default function BabySelectorPage() {
         totalGearMinutes += (endTime - startOfDay.getTime()) / (1000 * 60)
       }
 
-      stats.gearHours = Math.round((totalGearMinutes / 60) * 10) / 10 // 保留1位小数
-
-      console.log('📊 [loadTodayStats] 计算完成的统计数据:', {
-        milk: stats.milk,
-        food: stats.food,
-        sleep: stats.sleep,
-        shit: stats.shit,
-        todayRecords: todayRecords.length,
-      })
+      stats.gearHours = Math.round((totalGearMinutes / 60) * 10) / 10
 
       setTodayStats(stats)
-      console.log('✅ [loadTodayStats] 完成，设置统计数据')
     } catch (error) {
-      console.error('❌ [loadTodayStats] 加载今日统计失败:', error)
-      // 即使加载统计失败也不影响页面显示
+      console.error('加载今日统计失败:', error)
       setTodayStats(null)
     } finally {
       setStatsLoading(false)
-      console.log('🏁 [loadTodayStats] 结束，设置 statsLoading = false')
+    }
+  }
+
+  async function loadWeeklyData(babyId: number) {
+    try {
+      setChartLoading(true)
+
+      const weekData: DayData[] = []
+      const today = new Date()
+
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today)
+        date.setDate(date.getDate() - i)
+        const startOfDay = new Date(date)
+        startOfDay.setHours(0, 0, 0, 0)
+        const endOfDay = new Date(date)
+        endOfDay.setHours(23, 59, 59, 999)
+
+        const dateStr = dayjs(date).format('YYYY-MM-DD')
+
+        try {
+          // 获取当天记录
+          const response = await getRecords({
+            babyId,
+            limit: 1000,
+            offset: 0,
+            startDate: startOfDay.getTime(),
+            endDate: endOfDay.getTime(),
+          })
+
+          let milk = 0
+          let food = 0
+          let sleepMinutes = 0
+          let sleepCount = 0
+          const gearEvents: { type: 'on' | 'off'; time: number }[] = []
+
+          response.records.forEach((record) => {
+            switch (record.category) {
+              case 'food':
+                if (record.subCategory === 'breast_milk' || record.subCategory === 'milk') {
+                  milk += parseInt(record.value || '0') || 0
+                } else if (record.subCategory === 'babycook') {
+                  food++
+                }
+                break
+              case 'sleep':
+                sleepMinutes += parseInt(record.value || '0') || 0
+                sleepCount++
+                break
+              case 'other':
+                if (record.subCategory === 'gear') {
+                  const gearType = record.extra?.gear_type
+                  if (gearType === '带上') {
+                    gearEvents.push({ type: 'on', time: record.startTime })
+                  } else if (gearType === '脱下') {
+                    gearEvents.push({ type: 'off', time: record.startTime })
+                  }
+                }
+                break
+            }
+          })
+
+          // 获取前一天最后的护具状态
+          const yesterdayStart = new Date(startOfDay)
+          yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+          const yesterdayEnd = new Date(startOfDay)
+          yesterdayEnd.setMilliseconds(-1)
+
+          let yesterdayLastGearOn = false
+          const yesterdayAllGear = await getRecords({
+            babyId,
+            limit: 1000,
+            offset: 0,
+            startDate: yesterdayStart.getTime(),
+            endDate: yesterdayEnd.getTime(),
+          })
+
+          const yesterdayGearEvents = yesterdayAllGear.records
+            .filter((r) => r.category === 'other' && r.subCategory === 'gear')
+            .map((r) => ({
+              type: (r.extra?.gear_type === '带上' ? 'on' : 'off') as 'on' | 'off',
+              time: r.startTime,
+            }))
+            .sort((a, b) => {
+              if (a.time !== b.time) {
+                return a.time - b.time
+              }
+              if (a.type === 'on' && b.type === 'off') return -1
+              if (a.type === 'off' && b.type === 'on') return 1
+              return 0
+            })
+
+          if (yesterdayGearEvents.length > 0) {
+            const lastEvent = yesterdayGearEvents[yesterdayGearEvents.length - 1]
+            yesterdayLastGearOn = lastEvent.type === 'on'
+          }
+
+          // 排序今天的护具事件
+          gearEvents.sort((a, b) => {
+            if (a.time !== b.time) {
+              return a.time - b.time
+            }
+            if (a.type === 'on' && b.type === 'off') return -1
+            if (a.type === 'off' && b.type === 'on') return 1
+            return 0
+          })
+
+          // 过滤连续相同操作
+          const filteredGearEvents: { type: 'on' | 'off'; time: number }[] = []
+          let lastType: 'on' | 'off' | null = yesterdayLastGearOn ? 'on' : null
+
+          for (const event of gearEvents) {
+            if (event.type !== lastType) {
+              filteredGearEvents.push(event)
+              lastType = event.type
+            }
+          }
+
+          // 计算护具佩戴时长
+          let totalGearMinutes = 0
+          let lastOnTime: number | null = null
+
+          if (yesterdayLastGearOn && filteredGearEvents.length > 0) {
+            if (filteredGearEvents[0].type === 'off') {
+              totalGearMinutes += (filteredGearEvents[0].time - startOfDay.getTime()) / (1000 * 60)
+            } else {
+              lastOnTime = filteredGearEvents[0].time
+            }
+            for (let j = 1; j < filteredGearEvents.length; j++) {
+              const event = filteredGearEvents[j]
+              if (event.type === 'on') {
+                lastOnTime = event.time
+              } else if (event.type === 'off' && lastOnTime !== null) {
+                totalGearMinutes += (event.time - lastOnTime) / (1000 * 60)
+                lastOnTime = null
+              }
+            }
+          } else {
+            filteredGearEvents.forEach((event) => {
+              if (event.type === 'on') {
+                lastOnTime = event.time
+              } else if (event.type === 'off' && lastOnTime !== null) {
+                totalGearMinutes += (event.time - lastOnTime) / (1000 * 60)
+                lastOnTime = null
+              }
+            })
+          }
+
+          // 如果有未脱下的，计算到当天结束或当前时间
+          if (lastOnTime !== null) {
+            const isToday = dayjs(date).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD')
+            const endTime = isToday ? Date.now() : endOfDay.getTime()
+            totalGearMinutes += (endTime - lastOnTime) / (1000 * 60)
+          } else if (yesterdayLastGearOn && filteredGearEvents.length === 0) {
+            const isToday = dayjs(date).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD')
+            const endTime = isToday ? Date.now() : endOfDay.getTime()
+            totalGearMinutes += (endTime - startOfDay.getTime()) / (1000 * 60)
+          }
+
+          weekData.push({
+            date: dateStr,
+            milk,
+            food,
+            sleepMinutes,
+            sleepCount,
+            protectorMinutes: totalGearMinutes,
+          })
+        } catch (error) {
+          console.error(`获取 ${dateStr} 数据失败:`, error)
+          weekData.push({
+            date: dateStr,
+            milk: 0,
+            food: 0,
+            sleepMinutes: 0,
+            sleepCount: 0,
+            protectorMinutes: 0,
+          })
+        }
+      }
+
+      setWeeklyData(weekData)
+    } catch (error) {
+      console.error('加载周数据失败:', error)
+      setWeeklyData([])
+    } finally {
+      setChartLoading(false)
     }
   }
 
@@ -478,7 +656,9 @@ export default function BabySelectorPage() {
               {babies.map((baby) => (
                 <View
                   key={baby.id}
-                  className={`baby-card ${baby.id === currentBabyId ? 'active' : ''}`}
+                  className={`baby-card ${
+                    babies.length > 1 && baby.id === currentBabyId ? 'active' : ''
+                  }`}
                 >
                   {/* 左上角当前标签，仅在宝宝数量 > 1 时显示 */}
                   {babies.length > 1 && baby.id === currentBabyId && (
@@ -647,9 +827,19 @@ export default function BabySelectorPage() {
             </View>
           )}
 
-          <View className='coming-soon-section'>
-            <Text className='coming-soon-text'>图表功能开发中...</Text>
-          </View>
+          {/* 图表 */}
+          {currentBabyId && (
+            <View className='chart-section'>
+              {chartLoading ? (
+                <View className='chart-loading'>
+                  <LoadingSpinner size='large' />
+                  <Text className='loading-hint'>加载图表数据中...</Text>
+                </View>
+              ) : (
+                <WeeklyChart data={weeklyData} />
+              )}
+            </View>
+          )}
 
           {/* 添加新宝宝链接 */}
           <View className='add-baby-link' onClick={handleAddBaby}>
@@ -672,7 +862,6 @@ export default function BabySelectorPage() {
               {selectedBaby.members && selectedBaby.members.length > 0 ? (
                 selectedBaby.members.map((member) => (
                   <View key={member.userId} className='member-item'>
-                    <View className='member-icon'>👤</View>
                     <View className='member-info'>
                       <Text className='member-name'>{member.nickname}</Text>
                       <Text className='member-role'>{member.role}</Text>
