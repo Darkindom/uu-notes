@@ -468,7 +468,7 @@ export default function BabySelectorPage() {
             food,
             sleepMinutes,
             sleepCount,
-            protectorMinutes: totalGearMinutes,
+            gearMinutes: totalGearMinutes,
           })
         } catch (error) {
           console.error(`获取 ${dateStr} 数据失败:`, error)
@@ -479,7 +479,7 @@ export default function BabySelectorPage() {
             food: 0,
             sleepMinutes: 0,
             sleepCount: 0,
-            protectorMinutes: 0,
+            gearMinutes: 0,
           })
         }
       }

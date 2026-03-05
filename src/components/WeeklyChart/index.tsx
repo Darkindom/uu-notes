@@ -11,14 +11,14 @@ export interface DayData {
   food: number
   sleepMinutes: number
   sleepCount: number
-  protectorMinutes: number
+  gearMinutes: number
 }
 
 interface WeeklyChartProps {
   data: DayData[]
 }
 
-type TabType = 'milk' | 'sleep' | 'protector'
+type TabType = 'milk' | 'sleep' | 'gear'
 
 let chartInstance: any = null
 
@@ -177,19 +177,19 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
         series: filteredSeries,
       }
     } else {
-      const protectorData = data.map((d) => {
-        const hours = (d.protectorMinutes || 0) / 60
+      const gearData = data.map((d) => {
+        const hours = (d.gearMinutes || 0) / 60
         return Math.round(hours * 10) / 10
       })
-      console.log('护具数据:', data.map(d => ({ date: d.date, minutes: d.protectorMinutes, hours: d.protectorMinutes / 60 })))
-      console.log('图表数据:', protectorData)
+      console.log('护具数据:', data.map(d => ({ date: d.date, minutes: d.gearMinutes, hours: d.gearMinutes / 60 })))
+      console.log('图表数据:', gearData)
       return {
         categories,
         colors: ['#4CAF7D'],
         series: [
           {
             name: '佩戴时长(h)',
-            data: protectorData,
+            data: gearData,
             type: 'column',
             color: '#4CAF7D',
             index: 0,
@@ -202,17 +202,17 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
   const getLegendItems = useMemo(() => {
     if (activeTab === 'milk') {
       return [
-        { name: '奶量', color: '#FFB84D' },
-        { name: '夜奶', color: '#E63946' },
-        { name: '辅食', color: '#34C759' },
+        { name: '奶量(ml)', color: '#FFB84D', seriesName: '奶量' },
+        { name: '夜奶(ml)', color: '#E63946', seriesName: '夜奶' },
+        { name: '辅食(顿)', color: '#34C759', seriesName: '辅食' },
       ]
     } else if (activeTab === 'sleep') {
       return [
-        { name: '睡眠(h)', color: '#5B8DEF' },
-        { name: '次数', color: '#9B59B6' },
+        { name: '睡眠(h)', color: '#5B8DEF', seriesName: '睡眠(h)' },
+        { name: '次数', color: '#9B59B6', seriesName: '次数' },
       ]
     } else {
-      return [{ name: '佩戴时长(h)', color: '#4CAF7D' }]
+      return [{ name: '佩戴时长(h)', color: '#4CAF7D', seriesName: '佩戴时长(h)' }]
     }
   }, [activeTab])
 
@@ -241,7 +241,7 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           chartInstance = null
         }
 
-        const yAxisConfig = activeTab === 'protector' 
+        const yAxisConfig = activeTab === 'gear' 
           ? {
               data: [
                 {
@@ -341,8 +341,8 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           <Text className='tab-text'>睡眠情况</Text>
         </View>
         <View
-          className={`chart-tab ${activeTab === 'protector' ? 'active' : ''}`}
-          onClick={() => setActiveTab('protector')}
+          className={`chart-tab ${activeTab === 'gear' ? 'active' : ''}`}
+          onClick={() => setActiveTab('gear')}
         >
           <Text className='tab-text'>护具</Text>
         </View>
@@ -361,14 +361,14 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
         {legendItems.map((item) => (
           <View
             key={item.name}
-            className={`legend-item ${!visibleSeries[item.name] ? 'disabled' : ''}`}
-            onClick={() => toggleSeries(item.name)}
+            className={`legend-item ${!visibleSeries[item.seriesName] ? 'disabled' : ''}`}
+            onClick={() => toggleSeries(item.seriesName)}
           >
             <View
               className='legend-color'
-              style={{ backgroundColor: item.color, opacity: visibleSeries[item.name] ? 1 : 0.3 }}
+              style={{ backgroundColor: item.color, opacity: visibleSeries[item.seriesName] ? 1 : 0.3 }}
             />
-            <Text className='legend-text' style={{ opacity: visibleSeries[item.name] ? 1 : 0.5 }}>
+            <Text className='legend-text' style={{ opacity: visibleSeries[item.seriesName] ? 1 : 0.5 }}>
               {item.name}
             </Text>
           </View>
