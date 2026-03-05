@@ -109,7 +109,7 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           height: height,
           categories: chartData.categories,
           series: chartData.series,
-          animation: true,
+          animation: false,
           background: '#FFFFFF',
           color: chartData.colors,
           padding: [15, 30, 15, 10],
