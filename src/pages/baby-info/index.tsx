@@ -54,10 +54,15 @@ export default function BabySelectorPage() {
     await loadBabies()
   })
 
-  useDidShow(async () => {
+  useDidShow(() => {
     if (currentBabyId) {
-      await loadTodayStats(currentBabyId, selectedDate)
-      await loadWeeklyData(currentBabyId)
+      // 并行加载数据
+      Promise.all([
+        loadTodayStats(currentBabyId, selectedDate),
+        loadWeeklyData(currentBabyId)
+      ]).catch(error => {
+        console.error('加载数据失败:', error)
+      })
     }
   })
 
@@ -81,15 +86,20 @@ export default function BabySelectorPage() {
       setBabies(babyList)
       setCurrentBabyId(user?.currentBabyId)
       setCurrentUserId(user?.id)
+      setLoading(false)
 
+      // 并行加载今日数据和图表数据
       if (user?.currentBabyId) {
-        await loadTodayStats(user.currentBabyId, selectedDate)
-        await loadWeeklyData(user.currentBabyId)
+        Promise.all([
+          loadTodayStats(user.currentBabyId, selectedDate),
+          loadWeeklyData(user.currentBabyId)
+        ]).catch(error => {
+          console.error('加载数据失败:', error)
+        })
       }
     } catch (error) {
       console.error('加载宝宝列表失败:', error)
       Taro.showToast({ title: '加载失败', icon: 'none' })
-    } finally {
       setLoading(false)
     }
   }
