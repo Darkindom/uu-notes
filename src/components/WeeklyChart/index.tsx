@@ -104,23 +104,6 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
     })
   }, [])
 
-  const getLegendItems = useMemo(() => {
-    if (activeTab === 'milk') {
-      return [
-        { name: '奶量', color: '#FFB84D' },
-        { name: '夜奶', color: '#E63946' },
-        { name: '辅食', color: '#34C759' },
-      ]
-    } else if (activeTab === 'sleep') {
-      return [
-        { name: '睡眠(h)', color: '#5B8DEF' },
-        { name: '次数', color: '#9B59B6' },
-      ]
-    } else {
-      return [{ name: '佩戴时长(h)', color: '#4CAF7D' }]
-    }
-  }, [activeTab])
-
   // 准备图表数据
   const chartData = useMemo(() => {
     const categories = data.map((day) => {
@@ -215,6 +198,23 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
       }
     }
   }, [data, activeTab, visibleSeries])
+
+  const getLegendItems = useMemo(() => {
+    if (activeTab === 'milk') {
+      return [
+        { name: '奶量', color: '#FFB84D' },
+        { name: '夜奶', color: '#E63946' },
+        { name: '辅食', color: '#34C759' },
+      ]
+    } else if (activeTab === 'sleep') {
+      return [
+        { name: '睡眠(h)', color: '#5B8DEF' },
+        { name: '次数', color: '#9B59B6' },
+      ]
+    } else {
+      return [{ name: '佩戴时长(h)', color: '#4CAF7D' }]
+    }
+  }, [activeTab])
 
   const initChart = useCallback(() => {
     const query = Taro.createSelectorQuery()
