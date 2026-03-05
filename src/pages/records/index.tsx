@@ -165,15 +165,7 @@ export default function RecordsPage() {
           type: r.extra?.gear_type === '带上' ? ('on' as const) : ('off' as const),
           time: r.startTime,
         }))
-        .sort((a, b) => {
-          if (a.time !== b.time) {
-            return a.time - b.time
-          }
-          // 时间相同时，"带上"(on)排在前面，"脱下"(off)排在后面
-          if (a.type === 'on' && b.type === 'off') return -1
-          if (a.type === 'off' && b.type === 'on') return 1
-          return 0
-        })
+        .sort((a, b) => a.time - b.time)
 
       let yesterdayLastGearOn = false
       if (yesterdayGearEvents.length > 0) {
@@ -181,16 +173,8 @@ export default function RecordsPage() {
         yesterdayLastGearOn = lastEvent.type === 'on'
       }
 
-      // 排序时，如果时间相同，"带上"排在"脱下"前面
-      gearEvents.sort((a, b) => {
-        if (a.time !== b.time) {
-          return a.time - b.time
-        }
-        // 时间相同时，"带上"(on)排在前面，"脱下"(off)排在后面
-        if (a.type === 'on' && b.type === 'off') return -1
-        if (a.type === 'off' && b.type === 'on') return 1
-        return 0
-      })
+      // 排序今天的护具事件
+      gearEvents.sort((a, b) => a.time - b.time)
 
       const filteredGearEvents: { type: 'on' | 'off'; time: number }[] = []
       let lastType: 'on' | 'off' | null = yesterdayLastGearOn ? 'on' : null

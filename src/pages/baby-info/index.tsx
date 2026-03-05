@@ -227,15 +227,7 @@ export default function BabySelectorPage() {
             type: r.extra?.gear_type === '带上' ? 'on' : 'off',
             time: r.startTime,
           }))
-          .sort((a, b) => {
-            if (a.time !== b.time) {
-              return a.time - b.time
-            }
-            // 时间相同时，"带上"(on)排在前面，"脱下"(off)排在后面
-            if (a.type === 'on' && b.type === 'off') return -1
-            if (a.type === 'off' && b.type === 'on') return 1
-            return 0
-          })
+          .sort((a, b) => a.time - b.time)
 
         // 判断昨天最后一次操作
         if (yesterdayGearEvents.length > 0) {
@@ -245,16 +237,7 @@ export default function BabySelectorPage() {
       }
 
       // 计算护具佩戴时长
-      // 排序时，如果时间相同，"带上"排在"脱下"前面
-      gearEvents.sort((a, b) => {
-        if (a.time !== b.time) {
-          return a.time - b.time
-        }
-        // 时间相同时，"带上"(on)排在前面，"脱下"(off)排在后面
-        if (a.type === 'on' && b.type === 'off') return -1
-        if (a.type === 'off' && b.type === 'on') return 1
-        return 0
-      })
+      gearEvents.sort((a, b) => a.time - b.time)
 
       // 过滤掉连续的相同操作，只保留状态变化的事件
       const filteredGearEvents: { type: 'on' | 'off'; time: number }[] = []
@@ -416,14 +399,7 @@ export default function BabySelectorPage() {
               type: (r.extra?.gear_type === '带上' ? 'on' : 'off') as 'on' | 'off',
               time: r.startTime,
             }))
-            .sort((a, b) => {
-              if (a.time !== b.time) {
-                return a.time - b.time
-              }
-              if (a.type === 'on' && b.type === 'off') return -1
-              if (a.type === 'off' && b.type === 'on') return 1
-              return 0
-            })
+            .sort((a, b) => a.time - b.time)
 
           if (yesterdayGearEvents.length > 0) {
             const lastEvent = yesterdayGearEvents[yesterdayGearEvents.length - 1]
@@ -431,14 +407,7 @@ export default function BabySelectorPage() {
           }
 
           // 排序今天的护具事件
-          gearEvents.sort((a, b) => {
-            if (a.time !== b.time) {
-              return a.time - b.time
-            }
-            if (a.type === 'on' && b.type === 'off') return -1
-            if (a.type === 'off' && b.type === 'on') return 1
-            return 0
-          })
+          gearEvents.sort((a, b) => a.time - b.time)
 
           // 过滤连续相同操作
           const filteredGearEvents: { type: 'on' | 'off'; time: number }[] = []
