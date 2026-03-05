@@ -723,21 +723,21 @@ export default function BabySelectorPage() {
                       <Text className='stats-date'>{dayjs(selectedDate).format('YYYY.MM.DD')}</Text>
                       <Text className='date-arrow'>▼</Text>
                     </View>
+                    {dayjs(selectedDate).format('YYYY-MM-DD') !== dayjs().format('YYYY-MM-DD') && (
+                      <View
+                        className='back-to-today-btn'
+                        onClick={() => {
+                          setSelectedDate(new Date())
+                          if (currentBabyId) {
+                            loadTodayStats(currentBabyId, new Date())
+                          }
+                        }}
+                      >
+                        <Text className='back-to-today-text'>回到今天</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
-                {dayjs(selectedDate).format('YYYY-MM-DD') !== dayjs().format('YYYY-MM-DD') && (
-                  <Text
-                    className='back-to-today'
-                    onClick={() => {
-                      setSelectedDate(new Date())
-                      if (currentBabyId) {
-                        loadTodayStats(currentBabyId, new Date())
-                      }
-                    }}
-                  >
-                    回到今天
-                  </Text>
-                )}
               </View>
               <View className='stats-content'>
                 {!todayStats && !statsLoading && <Text className='stat-empty'>暂无数据</Text>}
