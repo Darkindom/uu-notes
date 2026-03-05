@@ -34,6 +34,7 @@ interface TodayStats {
   tonic: number // 补剂次数
   cry: number // 哭闹次数
   gearHours: number // 护具佩戴小时数
+  nightMilkCount: number // 夜奶次数
 }
 
 export default function BabySelectorPage() {
@@ -59,8 +60,8 @@ export default function BabySelectorPage() {
       // 并行加载数据
       Promise.all([
         loadTodayStats(currentBabyId, selectedDate),
-        loadWeeklyData(currentBabyId)
-      ]).catch(error => {
+        loadWeeklyData(currentBabyId),
+      ]).catch((error) => {
         console.error('加载数据失败:', error)
       })
     }
@@ -92,8 +93,8 @@ export default function BabySelectorPage() {
       if (user?.currentBabyId) {
         Promise.all([
           loadTodayStats(user.currentBabyId, selectedDate),
-          loadWeeklyData(user.currentBabyId)
-        ]).catch(error => {
+          loadWeeklyData(user.currentBabyId),
+        ]).catch((error) => {
           console.error('加载数据失败:', error)
         })
       }
@@ -154,6 +155,7 @@ export default function BabySelectorPage() {
         tonic: 0,
         cry: 0,
         gearHours: 0,
+        nightMilkCount: 0,
       }
 
       // 用于计算护具佩戴时间
@@ -165,6 +167,13 @@ export default function BabySelectorPage() {
             if (record.subCategory === 'breast_milk' || record.subCategory === 'milk') {
               // 统计奶量
               stats.milk += parseInt(record.value || '0') || 0
+
+              // 判断是否为夜奶（晚上12点到早上6点）
+              const recordTime = new Date(record.startTime)
+              const hour = recordTime.getHours()
+              if (hour >= 0 && hour < 6) {
+                stats.nightMilkCount++
+              }
             } else if (record.subCategory === 'babycook') {
               // 辅食次数
               stats.food++
@@ -346,6 +355,7 @@ export default function BabySelectorPage() {
           })
 
           let milk = 0
+          let nightMilk = 0
           let food = 0
           let sleepMinutes = 0
           let sleepCount = 0
@@ -355,7 +365,15 @@ export default function BabySelectorPage() {
             switch (record.category) {
               case 'food':
                 if (record.subCategory === 'breast_milk' || record.subCategory === 'milk') {
-                  milk += parseInt(record.value || '0') || 0
+                  const amount = parseInt(record.value || '0') || 0
+                  milk += amount
+
+                  // 判断是否为夜奶（晚上12点到早上6点）
+                  const recordTime = new Date(record.startTime)
+                  const hour = recordTime.getHours()
+                  if (hour >= 0 && hour < 6) {
+                    nightMilk += amount
+                  }
                 } else if (record.subCategory === 'babycook') {
                   food++
                 }
@@ -477,6 +495,7 @@ export default function BabySelectorPage() {
           weekData.push({
             date: dateStr,
             milk,
+            nightMilk,
             food,
             sleepMinutes,
             sleepCount,
@@ -487,6 +506,7 @@ export default function BabySelectorPage() {
           weekData.push({
             date: dateStr,
             milk: 0,
+            nightMilk: 0,
             food: 0,
             sleepMinutes: 0,
             sleepCount: 0,
@@ -762,11 +782,58 @@ export default function BabySelectorPage() {
                         <Text className='stat-label' style={{ color: '#FF9500' }}>
                           吃
                         </Text>
-                        <Text className='stat-value'>
-                          {todayStats.milk > 0 && `${todayStats.milk} ml 奶`}
-                          {todayStats.milk > 0 && todayStats.food > 0 && '，'}
-                          {todayStats.food > 0 && `${todayStats.food} 顿辅食`}
-                        </Text>
+                        <View className='stat-value-wrapper'>
+                          {todayStats.milk > 0 && (
+                            <>
+                              <Text className='stat-value'>{todayStats.milk} ml 奶</Text>
+                              {todayStats.nightMilkCount > 0 ? (
+                                <Text className='stat-value'>
+                                  (
+                                  <Text
+                                    className='night-milk-link'
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      Taro.showModal({
+                                        title: '夜奶说明',
+                                        content: '夜奶指的是晚上12点到早上6点期间的喂奶记录',
+                                        showCancel: false,
+                                        confirmText: '知道了',
+                                      })
+                                    }}
+                                  >
+                                    夜奶
+                                  </Text>
+                                  {` ${todayStats.nightMilkCount} 次)`}
+                                </Text>
+                              ) : (
+                                <Text className='stat-value'>
+                                  (无
+                                  <Text
+                                    className='night-milk-link'
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      Taro.showModal({
+                                        title: '夜奶说明',
+                                        content: '夜奶指的是晚上12点到早上6点期间的喂奶记录',
+                                        showCancel: false,
+                                        confirmText: '知道了',
+                                      })
+                                    }}
+                                  >
+                                    夜奶
+                                  </Text>
+                                  )
+                                </Text>
+                              )}
+                            </>
+                          )}
+                          {todayStats.milk > 0 && todayStats.food > 0 && (
+                            <Text className='stat-value'>，</Text>
+                          )}
+                          {todayStats.food > 0 && (
+                            <Text className='stat-value'>辅食 {todayStats.food} 顿</Text>
+                          )}
+                        </View>
                       </View>
                     )}
 

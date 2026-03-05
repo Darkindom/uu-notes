@@ -318,12 +318,31 @@
     flex-shrink: 0;
   }
 
+  .stat-value-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    flex: 1;
+  }
+
   .stat-value {
     font-size: 40px;
     color: #333;
     font-weight: 600;
     line-height: 1.6;
-    flex: 1;
+  }
+
+  .night-milk-link {
+    font-size: 40px;
+    color: #ff9500;
+    text-decoration: underline;
+    font-weight: 700;
+    line-height: 1.6;
+    transition: opacity 0.2s ease;
+
+    &:active {
+      opacity: 0.6;
+    }
   }
 
   .stat-empty {

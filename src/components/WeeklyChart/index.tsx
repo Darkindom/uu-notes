@@ -1,5 +1,5 @@
 import { View, Text, Canvas } from '@tarojs/components'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Taro from '@tarojs/taro'
 import uCharts from '@qiun/ucharts'
 import './index.less'
@@ -7,6 +7,7 @@ import './index.less'
 export interface DayData {
   date: string
   milk: number
+  nightMilk: number
   food: number
   sleepMinutes: number
   sleepCount: number
@@ -24,22 +25,198 @@ let chartInstance: any = null
 export default function WeeklyChart({ data }: WeeklyChartProps) {
   const [activeTab, setActiveTab] = useState<TabType>('milk')
   const [canvasId] = useState(`chart-${Math.random().toString(36).slice(2)}`)
+  const [visibleSeries, setVisibleSeries] = useState<Record<string, boolean>>({
+    奶量: true,
+    夜奶: true,
+    辅食: true,
+    '睡眠(h)': true,
+    次数: true,
+    '佩戴时长(h)': true,
+  })
+  const chartInstanceRef = useRef<any>(null)
+  const isInitializingRef = useRef(false)
+  const updateTimerRef = useRef<any>(null)
 
   useEffect(() => {
-    if (data && data.length > 0) {
-      setTimeout(() => {
+    if (data && data.length > 0 && !isInitializingRef.current) {
+      // 清除之前的定时器
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current)
+      }
+
+      isInitializingRef.current = true
+      updateTimerRef.current = setTimeout(() => {
         initChart()
-      }, 500)
+        isInitializingRef.current = false
+      }, 100)
+
+      return () => {
+        if (updateTimerRef.current) {
+          clearTimeout(updateTimerRef.current)
+        }
+        isInitializingRef.current = false
+      }
     }
 
     return () => {
-      if (chartInstance) {
-        chartInstance = null
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current = null
       }
     }
-  }, [data, activeTab])
+  }, [data, activeTab, visibleSeries])
 
-  const initChart = () => {
+  // 切换 tab 时重置为显示全部
+  useEffect(() => {
+    setVisibleSeries({
+      奶量: true,
+      夜奶: true,
+      辅食: true,
+      '睡眠(h)': true,
+      次数: true,
+      '佩戴时长(h)': true,
+    })
+  }, [activeTab])
+
+  const toggleSeries = useCallback((seriesName: string) => {
+    // 防止在初始化时点击
+    if (isInitializingRef.current) return
+
+    setVisibleSeries((prev) => {
+      // 检查当前是否只显示这一个系列
+      const currentVisible = Object.entries(prev).filter(([_, visible]) => visible)
+      const isOnlyThisVisible = currentVisible.length === 1 && prev[seriesName]
+
+      if (isOnlyThisVisible) {
+        // 如果当前只显示这个系列，点击后显示全部
+        const allVisible: Record<string, boolean> = {}
+        Object.keys(prev).forEach((key) => {
+          allVisible[key] = true
+        })
+        return allVisible
+      } else {
+        // 否则，只显示点击的这个系列
+        const onlyThis: Record<string, boolean> = {}
+        Object.keys(prev).forEach((key) => {
+          onlyThis[key] = key === seriesName
+        })
+        return onlyThis
+      }
+    })
+  }, [])
+
+  const getLegendItems = useMemo(() => {
+    if (activeTab === 'milk') {
+      return [
+        { name: '奶量', color: '#FFB84D' },
+        { name: '夜奶', color: '#E63946' },
+        { name: '辅食', color: '#34C759' },
+      ]
+    } else if (activeTab === 'sleep') {
+      return [
+        { name: '睡眠(h)', color: '#5B8DEF' },
+        { name: '次数', color: '#9B59B6' },
+      ]
+    } else {
+      return [{ name: '佩戴时长(h)', color: '#4CAF7D' }]
+    }
+  }, [activeTab])
+
+  // 准备图表数据
+  const chartData = useMemo(() => {
+    const categories = data.map((day) => {
+      const dateObj = new Date(day.date)
+      return `${dateObj.getMonth() + 1}/${dateObj.getDate()}`
+    })
+
+    if (activeTab === 'milk') {
+      const allSeries = [
+        {
+          name: '奶量',
+          data: data.map((d) => d.milk || 0),
+          type: 'column',
+          color: '#FFB84D',
+          index: 0,
+        },
+        {
+          name: '夜奶',
+          data: data.map((d) => d.nightMilk || 0),
+          type: 'line',
+          color: '#E63946',
+          style: 'straight',
+          index: 0,
+          lineWidth: 4,
+          pointShape: 'circle',
+        },
+        {
+          name: '辅食',
+          data: data.map((d) => d.food || 0),
+          type: 'line',
+          color: '#34C759',
+          style: 'curve',
+          index: 1,
+          lineWidth: 3,
+        },
+      ]
+
+      const filteredSeries = allSeries.filter((s) => visibleSeries[s.name])
+      const activeColors = filteredSeries.map((s) => s.color)
+
+      return {
+        categories,
+        colors: activeColors,
+        series: filteredSeries,
+      }
+    } else if (activeTab === 'sleep') {
+      const allSeries = [
+        {
+          name: '睡眠(h)',
+          data: data.map((d) => Math.round((d.sleepMinutes || 0) / 60)),
+          type: 'column',
+          color: '#5B8DEF',
+          index: 0,
+        },
+        {
+          name: '次数',
+          data: data.map((d) => d.sleepCount || 0),
+          type: 'line',
+          color: '#9B59B6',
+          style: 'curve',
+          index: 1,
+        },
+      ]
+
+      const filteredSeries = allSeries.filter((s) => visibleSeries[s.name])
+      const activeColors = filteredSeries.map((s) => s.color)
+
+      return {
+        categories,
+        colors: activeColors,
+        series: filteredSeries,
+      }
+    } else {
+      const protectorData = data.map((d) => {
+        const hours = (d.protectorMinutes || 0) / 60
+        return Math.round(hours * 10) / 10
+      })
+      console.log('护具数据:', data.map(d => ({ date: d.date, minutes: d.protectorMinutes, hours: d.protectorMinutes / 60 })))
+      console.log('图表数据:', protectorData)
+      return {
+        categories,
+        colors: ['#4CAF7D'],
+        series: [
+          {
+            name: '佩戴时长(h)',
+            data: protectorData,
+            type: 'column',
+            color: '#4CAF7D',
+            index: 0,
+          },
+        ],
+      }
+    }
+  }, [data, activeTab, visibleSeries])
+
+  const initChart = useCallback(() => {
     const query = Taro.createSelectorQuery()
     query
       .select(`#${canvasId}`)
@@ -59,8 +236,6 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
         canvas.width = width * dpr
         canvas.height = height * dpr
         ctx.scale(dpr, dpr)
-
-        const chartData = prepareChartData()
 
         if (chartInstance) {
           chartInstance = null
@@ -112,17 +287,10 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           animation: false,
           background: '#FFFFFF',
           color: chartData.colors,
-          padding: [15, 30, 15, 10],
+          padding: [15, 30, 50, 10],
           enableScroll: false,
           legend: {
-            show: true,
-            position: 'bottom',
-            float: 'center',
-            padding: 8,
-            margin: 10,
-            fontSize: 16,
-            fontColor: '#333333',
-            itemGap: 20,
+            show: false,
           },
           dataLabel: true,
           dataPointShape: true,
@@ -141,82 +309,11 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           },
         }
 
-        chartInstance = new uCharts(config)
+        chartInstanceRef.current = new uCharts(config)
       })
-  }
+  }, [data, activeTab, visibleSeries, chartData])
 
-  const prepareChartData = () => {
-    const categories = data.map((day) => {
-      const dateObj = new Date(day.date)
-      return `${dateObj.getMonth() + 1}/${dateObj.getDate()}`
-    })
-
-    if (activeTab === 'milk') {
-      return {
-        categories,
-        colors: ['#FF9500', '#4CAF7D'],
-        series: [
-          {
-            name: '奶量',
-            data: data.map((d) => d.milk || 0),
-            type: 'column',
-            color: '#FF9500',
-            index: 0,
-          },
-          {
-            name: '辅食',
-            data: data.map((d) => d.food || 0),
-            type: 'line',
-            color: '#4CAF7D',
-            style: 'curve',
-            index: 1,
-          },
-        ],
-      }
-    } else if (activeTab === 'sleep') {
-      return {
-        categories,
-        colors: ['#5B8DEF', '#9B59B6'],
-        series: [
-          {
-            name: '睡眠(h)',
-            data: data.map((d) => Math.round((d.sleepMinutes || 0) / 60)),
-            type: 'column',
-            color: '#5B8DEF',
-            index: 0,
-          },
-          {
-            name: '次数',
-            data: data.map((d) => d.sleepCount || 0),
-            type: 'line',
-            color: '#9B59B6',
-            style: 'curve',
-            index: 1,
-          },
-        ],
-      }
-    } else {
-      const protectorData = data.map((d) => {
-        const hours = (d.protectorMinutes || 0) / 60
-        return Math.round(hours * 10) / 10
-      })
-      console.log('护具数据:', data.map(d => ({ date: d.date, minutes: d.protectorMinutes, hours: d.protectorMinutes / 60 })))
-      console.log('图表数据:', protectorData)
-      return {
-        categories,
-        colors: ['#4CAF7D'],
-        series: [
-          {
-            name: '佩戴时长(h)',
-            data: protectorData,
-            type: 'column',
-            color: '#4CAF7D',
-            index: 0,
-          },
-        ],
-      }
-    }
-  }
+  const legendItems = useMemo(() => getLegendItems, [activeTab])
 
   if (!data || data.length === 0) {
     return (
@@ -258,6 +355,24 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           type='2d'
           className='chart-canvas'
         />
+      </View>
+
+      <View className='custom-legend'>
+        {legendItems.map((item) => (
+          <View
+            key={item.name}
+            className={`legend-item ${!visibleSeries[item.name] ? 'disabled' : ''}`}
+            onClick={() => toggleSeries(item.name)}
+          >
+            <View
+              className='legend-color'
+              style={{ backgroundColor: item.color, opacity: visibleSeries[item.name] ? 1 : 0.3 }}
+            />
+            <Text className='legend-text' style={{ opacity: visibleSeries[item.name] ? 1 : 0.5 }}>
+              {item.name}
+            </Text>
+          </View>
+        ))}
       </View>
     </View>
   )

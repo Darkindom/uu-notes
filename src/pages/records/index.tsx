@@ -19,6 +19,7 @@ interface TodayStats {
   tonic: number // 补剂次数
   cry: number // 哭闹次数
   gearHours: number // 护具佩戴小时数
+  nightMilkCount: number // 夜奶次数
 }
 
 const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
@@ -90,6 +91,7 @@ export default function RecordsPage() {
       tonic: 0,
       cry: 0,
       gearHours: 0,
+      nightMilkCount: 0,
     }
 
     const startOfDay = new Date(selectedDate)
@@ -104,6 +106,13 @@ export default function RecordsPage() {
         case 'food':
           if (record.subCategory === 'breast_milk' || record.subCategory === 'milk') {
             stats.milk += parseInt(record.value || '0') || 0
+
+            // 判断是否为夜奶（晚上12点到早上6点）
+            const recordTime = new Date(record.startTime)
+            const hour = recordTime.getHours()
+            if (hour >= 0 && hour < 6) {
+              stats.nightMilkCount++
+            }
           } else if (record.subCategory === 'babycook') {
             stats.food++
           }
@@ -457,11 +466,56 @@ export default function RecordsPage() {
                   {/* 吃类别 */}
                   {categoryFilter === 'food' && (todayStats.milk > 0 || todayStats.food > 0) && (
                     <View className='stat-line'>
-                      <Text className='stat-value-text'>
-                        {todayStats.milk > 0 && `${todayStats.milk} ml 奶`}
-                        {todayStats.milk > 0 && todayStats.food > 0 && '，'}
-                        {todayStats.food > 0 && `${todayStats.food} 顿辅食`}
-                      </Text>
+                      {todayStats.milk > 0 && (
+                        <>
+                          <Text className='stat-value-text'>{todayStats.milk} ml 奶</Text>
+                          {todayStats.nightMilkCount > 0 ? (
+                            <Text className='stat-value-text'>
+                              (
+                              <Text
+                                className='night-milk-link'
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  Taro.showModal({
+                                    title: '夜奶说明',
+                                    content: '夜奶指的是晚上12点到早上6点期间的喂奶记录',
+                                    showCancel: false,
+                                    confirmText: '知道了',
+                                  })
+                                }}
+                              >
+                                夜奶
+                              </Text>
+                              {` ${todayStats.nightMilkCount} 次)`}
+                            </Text>
+                          ) : (
+                            <Text className='stat-value-text'>
+                              (无
+                              <Text
+                                className='night-milk-link'
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  Taro.showModal({
+                                    title: '夜奶说明',
+                                    content: '夜奶指的是晚上12点到早上6点期间的喂奶记录',
+                                    showCancel: false,
+                                    confirmText: '知道了',
+                                  })
+                                }}
+                              >
+                                夜奶
+                              </Text>
+                              )
+                            </Text>
+                          )}
+                        </>
+                      )}
+                      {todayStats.milk > 0 && todayStats.food > 0 && (
+                        <Text className='stat-value-text'>，</Text>
+                      )}
+                      {todayStats.food > 0 && (
+                        <Text className='stat-value-text'>辅食 {todayStats.food} 顿</Text>
+                      )}
                     </View>
                   )}
 

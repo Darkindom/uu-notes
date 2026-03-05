@@ -49,6 +49,8 @@
   height: 500px;
   position: relative;
   overflow: hidden;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .chart-canvas {
@@ -70,4 +72,44 @@
   font-size: 40px;
   color: #999;
   font-weight: 600;
+}
+
+.custom-legend {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  margin-top: 32px;
+  padding: 0 24px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.legend-item:active {
+  transform: scale(0.95);
+}
+
+.legend-item.disabled {
+  opacity: 0.5;
+}
+
+.legend-color {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: opacity 0.2s;
+}
+
+.legend-text {
+  font-size: 32px;
+  font-weight: 500;
+  color: #333;
+  transition: opacity 0.2s;
 }
