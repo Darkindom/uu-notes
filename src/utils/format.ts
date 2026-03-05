@@ -20,7 +20,7 @@ export const SHIT_HARDNESS = [
   { label: '硬', value: 'hard' },
 ]
 
-export const TONIC_TYPES = ['AD', 'D3', '钙', '铁', '锌', '其他']
+export const TONIC_TYPES = ['AD', 'D3', '钙', '铁', '锌', 'DHA']
 
 export const SUBCATEGORY_LABELS: { [key: string]: string } = {
   breast_milk: '母乳',
@@ -94,6 +94,11 @@ export function formatRecordSummary(record: Record): string {
   }
   if (sub === 'gear') {
     return `护具 ${extra.gear_type ?? ''}`
+  }
+  if (sub === 'growth') {
+    const growthType = extra.growth_type ?? ''
+    const unit = growthType === '身高' ? 'cm' : 'kg'
+    return `${growthType} ${val}${unit}`
   }
   return SUBCATEGORY_LABELS[sub] ?? sub
 }

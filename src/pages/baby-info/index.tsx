@@ -461,6 +461,20 @@ export default function BabySelectorPage() {
             totalGearMinutes += (endTime - startOfDay.getTime()) / (1000 * 60)
           }
 
+          // 获取成长数据 - 身高和体重
+          const growthRecords = response.records.filter(
+            (r) => r.category === 'other' && r.subCategory === 'growth'
+          )
+          let height = 0
+          let weight = 0
+          growthRecords.forEach((r) => {
+            if (r.extra?.growth_type === '身高') {
+              height = parseFloat(r.value) || 0
+            } else if (r.extra?.growth_type === '体重') {
+              weight = parseFloat(r.value) || 0
+            }
+          })
+
           weekData.push({
             date: dateStr,
             milk,
@@ -469,6 +483,8 @@ export default function BabySelectorPage() {
             sleepMinutes,
             sleepCount,
             gearMinutes: totalGearMinutes,
+            height,
+            weight,
           })
         } catch (error) {
           console.error(`获取 ${dateStr} 数据失败:`, error)
@@ -480,6 +496,8 @@ export default function BabySelectorPage() {
             sleepMinutes: 0,
             sleepCount: 0,
             gearMinutes: 0,
+            height: 0,
+            weight: 0,
           })
         }
       }

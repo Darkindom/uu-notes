@@ -12,13 +12,15 @@ export interface DayData {
   sleepMinutes: number
   sleepCount: number
   gearMinutes: number
+  height: number
+  weight: number
 }
 
 interface WeeklyChartProps {
   data: DayData[]
 }
 
-type TabType = 'milk' | 'sleep' | 'gear'
+type TabType = 'milk' | 'sleep' | 'gear' | 'growth'
 
 let chartInstance: any = null
 
@@ -29,9 +31,11 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
     奶量: true,
     夜奶: true,
     辅食: true,
-    '睡眠(h)': true,
+    睡眠: true,
     次数: true,
-    '佩戴时长(h)': true,
+    护具: true,
+    身高: true,
+    体重: true,
   })
   const chartInstanceRef = useRef<any>(null)
   const isInitializingRef = useRef(false)
@@ -71,9 +75,11 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
       奶量: true,
       夜奶: true,
       辅食: true,
-      '睡眠(h)': true,
+      睡眠: true,
       次数: true,
-      '佩戴时长(h)': true,
+      护具: true,
+      身高: true,
+      体重: true,
     })
   }, [activeTab])
 
@@ -152,7 +158,7 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
     } else if (activeTab === 'sleep') {
       const allSeries = [
         {
-          name: '睡眠(h)',
+          name: '睡眠',
           data: data.map((d) => Math.round((d.sleepMinutes || 0) / 60)),
           type: 'column',
           color: '#5B8DEF',
@@ -176,25 +182,61 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
         colors: activeColors,
         series: filteredSeries,
       }
-    } else {
+    } else if (activeTab === 'gear') {
       const gearData = data.map((d) => {
         const hours = (d.gearMinutes || 0) / 60
         return Math.round(hours * 10) / 10
       })
-      console.log('护具数据:', data.map(d => ({ date: d.date, minutes: d.gearMinutes, hours: d.gearMinutes / 60 })))
+      console.log(
+        '护具数据:',
+        data.map((d) => ({ date: d.date, minutes: d.gearMinutes, hours: d.gearMinutes / 60 })),
+      )
       console.log('图表数据:', gearData)
       return {
         categories,
         colors: ['#4CAF7D'],
         series: [
           {
-            name: '佩戴时长(h)',
+            name: '护具',
             data: gearData,
             type: 'column',
             color: '#4CAF7D',
             index: 0,
           },
         ],
+      }
+    } else {
+      // growth tab
+      const allSeries = [
+        {
+          name: '身高',
+          data: data.map((d) => d.height || 0),
+          type: 'line',
+          color: '#FF6B9D',
+          style: 'curve',
+          index: 0,
+          lineWidth: 3,
+          pointShape: 'circle',
+        },
+        {
+          name: '体重',
+          data: data.map((d) => d.weight || 0),
+          type: 'line',
+          color: '#4ECDC4',
+          style: 'curve',
+          index: 1,
+          lineWidth: 3,
+          pointShape: 'circle',
+        },
+      ]
+
+      const filteredSeries = allSeries.filter((s) => visibleSeries[s.name])
+      const activeColors = filteredSeries.map((s) => s.color)
+
+      return {
+        categories,
+        colors: activeColors,
+        series: filteredSeries,
       }
     }
   }, [data, activeTab, visibleSeries])
@@ -208,11 +250,16 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
       ]
     } else if (activeTab === 'sleep') {
       return [
-        { name: '睡眠(h)', color: '#5B8DEF', seriesName: '睡眠(h)' },
+        { name: '睡眠(h)', color: '#5B8DEF', seriesName: '睡眠' },
         { name: '次数', color: '#9B59B6', seriesName: '次数' },
       ]
+    } else if (activeTab === 'gear') {
+      return [{ name: '佩戴时长(h)', color: '#4CAF7D', seriesName: '护具' }]
     } else {
-      return [{ name: '佩戴时长(h)', color: '#4CAF7D', seriesName: '佩戴时长(h)' }]
+      return [
+        { name: '身高(cm)', color: '#FF6B9D', seriesName: '身高' },
+        { name: '体重(kg)', color: '#4ECDC4', seriesName: '体重' },
+      ]
     }
   }, [activeTab])
 
@@ -241,41 +288,64 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           chartInstance = null
         }
 
-        const yAxisConfig = activeTab === 'gear' 
-          ? {
-              data: [
-                {
-                  disabled: false,
-                  position: 'left',
-                  gridType: 'dash',
-                  dashLength: 2,
-                  fontSize: 14,
-                  fontColor: '#666666',
-                  format: (val: number) => val.toFixed(1),
-                },
-              ],
-            }
-          : {
-              data: [
-                {
-                  disabled: false,
-                  position: 'left',
-                  gridType: 'dash',
-                  dashLength: 2,
-                  fontSize: 14,
-                  fontColor: '#666666',
-                  format: (val: number) => val.toFixed(0),
-                },
-                {
-                  disabled: false,
-                  position: 'right',
-                  gridType: 'none',
-                  fontSize: 14,
-                  fontColor: '#666666',
-                  format: (val: number) => val.toFixed(0),
-                },
-              ],
-            }
+        const yAxisConfig =
+          activeTab === 'gear'
+            ? {
+                data: [
+                  {
+                    disabled: false,
+                    position: 'left',
+                    gridType: 'dash',
+                    dashLength: 2,
+                    fontSize: 14,
+                    fontColor: '#666666',
+                    format: (val: number) => val.toFixed(1),
+                  },
+                ],
+              }
+            : activeTab === 'growth'
+            ? {
+                data: [
+                  {
+                    disabled: false,
+                    position: 'left',
+                    gridType: 'dash',
+                    dashLength: 2,
+                    fontSize: 14,
+                    fontColor: '#666666',
+                    format: (val: number) => val.toFixed(1),
+                  },
+                  {
+                    disabled: false,
+                    position: 'right',
+                    gridType: 'none',
+                    fontSize: 14,
+                    fontColor: '#666666',
+                    format: (val: number) => val.toFixed(2),
+                  },
+                ],
+              }
+            : {
+                data: [
+                  {
+                    disabled: false,
+                    position: 'left',
+                    gridType: 'dash',
+                    dashLength: 2,
+                    fontSize: 14,
+                    fontColor: '#666666',
+                    format: (val: number) => val.toFixed(0),
+                  },
+                  {
+                    disabled: false,
+                    position: 'right',
+                    gridType: 'none',
+                    fontSize: 14,
+                    fontColor: '#666666',
+                    format: (val: number) => val.toFixed(0),
+                  },
+                ],
+              }
 
         const config = {
           type: 'mix',
@@ -338,7 +408,7 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           className={`chart-tab ${activeTab === 'sleep' ? 'active' : ''}`}
           onClick={() => setActiveTab('sleep')}
         >
-          <Text className='tab-text'>睡眠情况</Text>
+          <Text className='tab-text'>睡眠</Text>
         </View>
         <View
           className={`chart-tab ${activeTab === 'gear' ? 'active' : ''}`}
@@ -346,15 +416,16 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
         >
           <Text className='tab-text'>护具</Text>
         </View>
+        <View
+          className={`chart-tab ${activeTab === 'growth' ? 'active' : ''}`}
+          onClick={() => setActiveTab('growth')}
+        >
+          <Text className='tab-text'>成长</Text>
+        </View>
       </View>
 
       <View className='chart-wrapper'>
-        <Canvas
-          id={canvasId}
-          canvasId={canvasId}
-          type='2d'
-          className='chart-canvas'
-        />
+        <Canvas id={canvasId} canvasId={canvasId} type='2d' className='chart-canvas' />
       </View>
 
       <View className='custom-legend'>
@@ -366,9 +437,15 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
           >
             <View
               className='legend-color'
-              style={{ backgroundColor: item.color, opacity: visibleSeries[item.seriesName] ? 1 : 0.3 }}
+              style={{
+                backgroundColor: item.color,
+                opacity: visibleSeries[item.seriesName] ? 1 : 0.3,
+              }}
             />
-            <Text className='legend-text' style={{ opacity: visibleSeries[item.seriesName] ? 1 : 0.5 }}>
+            <Text
+              className='legend-text'
+              style={{ opacity: visibleSeries[item.seriesName] ? 1 : 0.5 }}
+            >
               {item.name}
             </Text>
           </View>

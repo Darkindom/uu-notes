@@ -7,16 +7,18 @@ import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES, formatRecordSumma
 import Calendar from '../../components/Calendar'
 import './index.less'
 
-type SubType = 'tonic' | 'outdoor' | 'cry' | 'gear'
+type SubType = 'tonic' | 'growth' | 'outdoor' | 'cry' | 'gear'
 
 const SUB_MENUS: { label: string; value: SubType }[] = [
-  { label: '户外', value: 'outdoor' },
   { label: '补剂', value: 'tonic' },
+  { label: '成长', value: 'growth' },
+  { label: '户外', value: 'outdoor' },
   { label: '哭闹', value: 'cry' },
   { label: '护具', value: 'gear' },
 ]
 
 const GEAR_TYPES = ['带上', '脱下']
+const GROWTH_TYPES = ['身高', '体重']
 
 export default function OtherPage() {
   const router = useRouter()
@@ -26,9 +28,11 @@ export default function OtherPage() {
   const dt = getCurrentDateTime()
   const [date, setDate] = useState(dt.date)
   const [time, setTime] = useState(dt.time)
-  const [subType, setSubType] = useState<SubType>('outdoor')
+  const [subType, setSubType] = useState<SubType>('tonic')
   const [tonicType, setTonicType] = useState(TONIC_TYPES[0])
   const [gearType, setGearType] = useState(GEAR_TYPES[0])
+  const [growthType, setGrowthType] = useState(GROWTH_TYPES[0])
+  const [growthValue, setGrowthValue] = useState('')
   const [duration, setDuration] = useState('')
   const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -49,6 +53,9 @@ export default function OtherPage() {
             setTonicType(record.extra.tonic_type || TONIC_TYPES[0])
           } else if (record.subCategory === 'gear' && record.extra) {
             setGearType(record.extra.gear_type || GEAR_TYPES[0])
+          } else if (record.subCategory === 'growth' && record.extra) {
+            setGrowthType(record.extra.growth_type || GROWTH_TYPES[0])
+            setGrowthValue(record.value || '')
           } else {
             setDuration(record.value || '')
           }
@@ -85,7 +92,9 @@ export default function OtherPage() {
         setTonicType(TONIC_TYPES[0])
       }
       setDuration('')
+      setGrowthValue('')
       setGearType(GEAR_TYPES[0])
+      setGrowthType(GROWTH_TYPES[0])
     } else if (sub === 'gear') {
       try {
         const extra = r.extra as any
@@ -94,11 +103,27 @@ export default function OtherPage() {
         setGearType(GEAR_TYPES[0])
       }
       setDuration('')
+      setGrowthValue('')
       setTonicType(TONIC_TYPES[0])
-    } else {
-      setDuration(r.value || '')
+      setGrowthType(GROWTH_TYPES[0])
+    } else if (sub === 'growth') {
+      try {
+        const extra = r.extra as any
+        setGrowthType(extra?.growth_type ?? GROWTH_TYPES[0])
+        setGrowthValue(r.value || '')
+      } catch {
+        setGrowthType(GROWTH_TYPES[0])
+        setGrowthValue(r.value || '')
+      }
+      setDuration('')
       setTonicType(TONIC_TYPES[0])
       setGearType(GEAR_TYPES[0])
+    } else {
+      setDuration(r.value || '')
+      setGrowthValue('')
+      setTonicType(TONIC_TYPES[0])
+      setGearType(GEAR_TYPES[0])
+      setGrowthType(GROWTH_TYPES[0])
     }
   }
 
@@ -114,6 +139,13 @@ export default function OtherPage() {
     } else if (subType === 'gear') {
       value = '1'
       extra = { gear_type: gearType }
+    } else if (subType === 'growth') {
+      if (!growthValue) {
+        Taro.showToast({ title: `请输入${growthType}`, icon: 'none' })
+        return
+      }
+      value = growthValue
+      extra = { growth_type: growthType }
     } else {
       if (!duration) {
         Taro.showToast({ title: '请输入时长', icon: 'none' })
@@ -241,6 +273,39 @@ export default function OtherPage() {
               ))}
             </View>
           </View>
+        )}
+
+        {/* Growth */}
+        {subType === 'growth' && (
+          <>
+            <View className='section'>
+              <Text className='field-label'>类型</Text>
+              <View className='options-row'>
+                {GROWTH_TYPES.map((t) => (
+                  <View
+                    key={t}
+                    className={`option-chip ${growthType === t ? 'active' : ''}`}
+                    onClick={() => setGrowthType(t)}
+                  >
+                    <Text>{t}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <View className='section'>
+              <Text className='field-label'>{growthType}</Text>
+              <View className='number-input-row'>
+                <Input
+                  className='duration-input'
+                  type='digit'
+                  placeholder={growthType === '身高' ? '厘米' : '千克(公斤)'}
+                  value={growthValue}
+                  onInput={(e) => setGrowthValue(e.detail.value)}
+                />
+                <Text className='unit-text'>{growthType === '身高' ? '厘米' : '千克'}</Text>
+              </View>
+            </View>
+          </>
         )}
 
         {/* Duration */}
