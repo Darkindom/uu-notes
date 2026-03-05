@@ -24,7 +24,7 @@ export default function ShitPage() {
   const dt = getCurrentDateTime()
   const [date, setDate] = useState(dt.date)
   const [time, setTime] = useState(dt.time)
-  const [shitType, setShitType] = useState<'big' | 'small'>('big')
+  const [shitType, setShitType] = useState<'big' | 'small'>('small')
   const [amountIdx, setAmountIdx] = useState<number | null>(null)
   const [color, setColor] = useState<string | null>(null)
   const [hardness, setHardness] = useState<string | null>(null)
@@ -32,15 +32,25 @@ export default function ShitPage() {
   const [loading, setLoading] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
 
+  // Clear extra fields when switching to "换尿片"
+  const handleTypeChange = (type: 'big' | 'small') => {
+    setShitType(type)
+    if (type === 'small') {
+      setAmountIdx(null)
+      setColor(null)
+      setHardness(null)
+    }
+  }
+
   useLoad(async () => {
     try {
       // 如果是编辑模式，从缓存读取记录详情
       if (isEdit && editId) {
         const record = Taro.getStorageSync('editRecord')
         if (record && record.id === editId) {
-          const dt = timestampToDateTime(record.startTime)
-          setDate(dt.date)
-          setTime(dt.time)
+          const recordDt = timestampToDateTime(record.startTime)
+          setDate(recordDt.date)
+          setTime(recordDt.time)
           setShitType(record.subCategory as 'big' | 'small')
           const idx = AMOUNT_VALUES.indexOf(record.value || '')
           setAmountIdx(idx >= 0 ? idx : null)
@@ -157,6 +167,25 @@ export default function ShitPage() {
   return (
     <View className='page-container shit-page'>
       <View className='main-card'>
+        {/* Type Selection */}
+        <View className='section'>
+          <Text className='field-label'>选择类型</Text>
+          <View className='type-row'>
+            <View
+              className={`type-btn ${shitType === 'small' ? 'active' : ''}`}
+              onClick={() => handleTypeChange('small')}
+            >
+              <Text className='type-label'>换尿片</Text>
+            </View>
+            <View
+              className={`type-btn ${shitType === 'big' ? 'active' : ''}`}
+              onClick={() => handleTypeChange('big')}
+            >
+              <Text className='type-label'>大便</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Time */}
         <View className='section section-inline'>
           <Text className='field-label'>时间</Text>
@@ -168,53 +197,58 @@ export default function ShitPage() {
           </View>
         </View>
 
-        {/* Amount */}
-        <View className='section section-inline'>
-          <Text className='field-label'>数量</Text>
-          <View className='options-row'>
-            {AMOUNT_LABELS.map((label, idx) => (
-              <View
-                key={label}
-                className={`option-chip ${amountIdx === idx ? 'active' : ''}`}
-                onClick={() => setAmountIdx(amountIdx === idx ? null : idx)}
-              >
-                <Text>{label}</Text>
+        {/* 大便 - Show all fields */}
+        {shitType === 'big' && (
+          <>
+            {/* Amount */}
+            <View className='section section-inline'>
+              <Text className='field-label'>数量</Text>
+              <View className='options-row'>
+                {AMOUNT_LABELS.map((label, idx) => (
+                  <View
+                    key={label}
+                    className={`option-chip ${amountIdx === idx ? 'active' : ''}`}
+                    onClick={() => setAmountIdx(amountIdx === idx ? null : idx)}
+                  >
+                    <Text>{label}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        </View>
+            </View>
 
-        {/* Color */}
-        <View className='section section-inline'>
-          <Text className='field-label'>颜色</Text>
-          <View className='options-row'>
-            {SHIT_COLORS.map((c) => (
-              <View
-                key={c.value}
-                className={`option-chip color-chip ${color === c.value ? 'active' : ''}`}
-                onClick={() => setColor(color === c.value ? null : c.value)}
-              >
-                <Text>{c.label}</Text>
+            {/* Color */}
+            <View className='section section-inline'>
+              <Text className='field-label'>颜色</Text>
+              <View className='options-row'>
+                {SHIT_COLORS.map((c) => (
+                  <View
+                    key={c.value}
+                    className={`option-chip color-chip ${color === c.value ? 'active' : ''}`}
+                    onClick={() => setColor(color === c.value ? null : c.value)}
+                  >
+                    <Text>{c.label}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        </View>
+            </View>
 
-        {/* Hardness */}
-        <View className='section section-inline'>
-          <Text className='field-label'>软硬</Text>
-          <View className='options-row'>
-            {SHIT_HARDNESS.map((h) => (
-              <View
-                key={h.value}
-                className={`option-chip ${hardness === h.value ? 'active' : ''}`}
-                onClick={() => setHardness(hardness === h.value ? null : h.value)}
-              >
-                <Text>{h.label}</Text>
+            {/* Hardness */}
+            <View className='section section-inline'>
+              <Text className='field-label'>软硬</Text>
+              <View className='options-row'>
+                {SHIT_HARDNESS.map((h) => (
+                  <View
+                    key={h.value}
+                    className={`option-chip ${hardness === h.value ? 'active' : ''}`}
+                    onClick={() => setHardness(hardness === h.value ? null : h.value)}
+                  >
+                    <Text>{h.label}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        </View>
+            </View>
+          </>
+        )}
 
         {/* Prefill - 移到最下面，编辑时不显示 */}
         {!isEdit && recentRecords.length > 0 && (

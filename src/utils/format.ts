@@ -11,7 +11,6 @@ export const SHIT_COLORS = [
   { label: '黑', value: 'black' },
   { label: '绿', value: 'green' },
   { label: '红', value: 'red' },
-  { label: '其他', value: 'other' },
 ]
 
 export const SHIT_HARDNESS = [
