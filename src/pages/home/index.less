@@ -30,7 +30,7 @@
 
 .title-section {
   text-align: center;
-  padding: 20px 0;
+  padding: 12px 0 36px;
 }
 
 .baby-title {
@@ -80,13 +80,16 @@
   padding: 0 24px;
   display: flex;
   flex-direction: column;
+  &:empty {
+    display: none;
+  }
 }
 
 .hint-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid #f5f5f5;
+  border-bottom: 2px solid #f0e8e0;
 
   &:last-child {
     border-bottom: none;
@@ -100,19 +103,19 @@
 }
 
 .hint-label-light {
-  font-size: 48px;
+  font-size: 40px;
   font-weight: 400;
   color: #999;
 }
 
 .hint-label-bold {
-  font-size: 56px;
+  font-size: 48px;
   font-weight: 900;
   color: #333;
 }
 
 .hint-time {
-  font-size: 56px;
+  font-size: 48px;
   font-weight: 900;
-  color: #999;
+  color: #666;
 }

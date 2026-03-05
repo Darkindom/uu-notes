@@ -29,17 +29,17 @@ export default function HomePage() {
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    
+
     // 超过2天，显示"x天以上"
     if (days > 2) {
       return `${days} 天以上`
     }
-    
+
     const parts: string[] = []
     if (days > 0) parts.push(`${days} 天`)
     if (hours > 0) parts.push(`${hours} 时`)
     if (minutes > 0) parts.push(`${minutes} 分`)
-    
+
     return parts.length > 0 ? parts.join(' ') : '刚刚'
   }
 
@@ -145,15 +145,6 @@ export default function HomePage() {
               <Text className='hint-time'>{timeSinceFood}</Text>
             </View>
           )}
-          {timeSincePoop && (
-            <View className='hint-item'>
-              <View className='hint-label'>
-                <Text className='hint-label-light'>距上次</Text>
-                <Text className='hint-label-bold'>大便</Text>
-              </View>
-              <Text className='hint-time'>{timeSincePoop}</Text>
-            </View>
-          )}
           {timeSinceDiaper && (
             <View className='hint-item'>
               <View className='hint-label'>
@@ -161,6 +152,15 @@ export default function HomePage() {
                 <Text className='hint-label-bold'>换尿布</Text>
               </View>
               <Text className='hint-time'>{timeSinceDiaper}</Text>
+            </View>
+          )}
+          {timeSincePoop && (
+            <View className='hint-item'>
+              <View className='hint-label'>
+                <Text className='hint-label-light'>距上次</Text>
+                <Text className='hint-label-bold'>大便</Text>
+              </View>
+              <Text className='hint-time'>{timeSincePoop}</Text>
             </View>
           )}
         </View>
