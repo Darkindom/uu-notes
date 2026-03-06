@@ -14,7 +14,9 @@ interface TodayStats {
   food: number // 辅食次数
   sleep: number // 睡眠次数
   sleepMinutes: number // 睡眠总分钟数
-  shit: number // 大便次数
+  shit: number // 拉的总次数（包括大便和换尿片）
+  poop: number // 大便次数
+  diaper: number // 换尿片次数
   outdoor: number // 户外次数
   tonic: number // 补剂次数
   cry: number // 哭闹次数
@@ -87,6 +89,8 @@ export default function RecordsPage() {
       sleep: 0,
       sleepMinutes: 0,
       shit: 0,
+      poop: 0,
+      diaper: 0,
       outdoor: 0,
       tonic: 0,
       cry: 0,
@@ -123,6 +127,12 @@ export default function RecordsPage() {
           break
         case 'shit':
           stats.shit++
+          // 分别统计大便和换尿片
+          if (record.subCategory === 'big') {
+            stats.poop++
+          } else if (record.subCategory === 'small') {
+            stats.diaper++
+          }
           break
         case 'other':
           if (record.subCategory === 'outdoor') {
@@ -514,9 +524,13 @@ export default function RecordsPage() {
                   )}
 
                   {/* 拉类别 */}
-                  {categoryFilter === 'shit' && todayStats.shit > 0 && (
+                  {categoryFilter === 'shit' && (todayStats.diaper > 0 || todayStats.poop > 0) && (
                     <View className='stat-line'>
-                      <Text className='stat-value-text'>{todayStats.shit} 次</Text>
+                      <Text className='stat-value-text'>
+                        {todayStats.diaper > 0 && `换尿片 ${todayStats.diaper} 次`}
+                        {todayStats.diaper > 0 && todayStats.poop > 0 && '，'}
+                        {todayStats.poop > 0 && `大便 ${todayStats.poop} 次`}
+                      </Text>
                     </View>
                   )}
 
@@ -551,7 +565,7 @@ export default function RecordsPage() {
                       todayStats.milk === 0 &&
                       todayStats.food === 0) ||
                       (categoryFilter === 'sleep' && todayStats.sleep === 0) ||
-                      (categoryFilter === 'shit' && todayStats.shit === 0) ||
+                      (categoryFilter === 'shit' && todayStats.diaper === 0 && todayStats.poop === 0) ||
                       (categoryFilter === 'other' &&
                         todayStats.outdoor === 0 &&
                         todayStats.tonic === 0 &&

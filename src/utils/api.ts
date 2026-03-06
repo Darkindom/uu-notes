@@ -6,10 +6,9 @@ import {
   getCachedBabies,
   setCachedBabies,
   clearCachedBabies,
-  getCachedRecords,
-  setCachedRecords,
   clearAllCachedRecords,
 } from './cache'
+import { recordStore } from '../store/recordStore'
 
 // 环境配置
 const ENV = process.env.TARO_APP_ENV || 'prod' // 默认使用生产环境
@@ -305,39 +304,58 @@ export const getRecords = async (params: {
     .map(([k, v]) => `${k}=${v}`)
     .join('&')
 
-  // 如果有 babyId 和日期范围，尝试使用缓存
+  // 如果有 babyId 和日期范围，尝试使用全局 recordStore
   if (params.babyId && params.startDate && params.endDate) {
     const startDate = new Date(params.startDate)
-    const dateKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+    const endDate = new Date(params.endDate)
     
-    const cachedRecords = getCachedRecords(params.babyId, dateKey, params.category || '')
+    // 检查是否查询单天数据
+    const isSingleDay = 
+      startDate.getFullYear() === endDate.getFullYear() &&
+      startDate.getMonth() === endDate.getMonth() &&
+      startDate.getDate() === endDate.getDate()
     
-    // 有缓存立即返回，同时在后台刷新
-    if (cachedRecords) {
-      request<any>({ url: `/records${query ? '?' + query : ''}` })
-        .then((data) => {
-          const records = data.data || data
-          setCachedRecords(params.babyId!, dateKey, params.category || '', records)
-        })
-        .catch(err => console.error('后台更新记录列表失败:', err))
+    if (isSingleDay) {
+      const dateKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+      
+      // 先尝试从 recordStore 获取
+      const cachedRecords = recordStore.getRecords(params.babyId, dateKey)
+      
+      if (cachedRecords) {
+        // 有缓存，立即返回，同时在后台刷新
+        request<any>({ url: `/records${query ? '?' + query : ''}` })
+          .then((data) => {
+            const records = data.data || data
+            recordStore.setRecords(params.babyId!, dateKey, records)
+          })
+          .catch(err => console.error('[getRecords] 后台更新失败:', err))
+        
+        // 如果有 category 筛选，过滤结果
+        const filteredRecords = params.category 
+          ? cachedRecords.filter(r => r.category === params.category)
+          : cachedRecords
+        
+        return {
+          records: filteredRecords,
+          pagination: { total: filteredRecords.length, limit: params.limit || 20, offset: 0, hasMore: false },
+        }
+      }
+      
+      // 无缓存，等待请求
+      const data = await request<any>({ url: `/records${query ? '?' + query : ''}` })
+      const records = data.data || data
+      
+      // 存入 recordStore
+      recordStore.setRecords(params.babyId, dateKey, records)
       
       return {
-        records: cachedRecords,
-        pagination: { total: cachedRecords.length, limit: params.limit || 20, offset: 0, hasMore: false },
+        records,
+        pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false },
       }
-    }
-    
-    // 无缓存等待请求
-    const data = await request<any>({ url: `/records${query ? '?' + query : ''}` })
-    const records = data.data || data
-    setCachedRecords(params.babyId, dateKey, params.category || '', records)
-    return {
-      records,
-      pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false },
     }
   }
   
-  // 没有缓存条件，直接请求
+  // 跨天查询或没有缓存条件，直接请求
   const data = await request<any>({ url: `/records${query ? '?' + query : ''}` })
   return {
     records: data.data || data,
@@ -363,6 +381,7 @@ export const createRecord = async (data: {
   
   // 成功后，清除相关日期的缓存以便重新加载
   clearAllCachedRecords(data.babyId)
+  recordStore.clearBabyRecords(data.babyId)
   
   return result
 }
@@ -383,6 +402,7 @@ export const updateRecord = async (
   
   // 成功后，清除所有记录缓存以便重新加载
   clearAllCachedRecords()
+  recordStore.clearAll()
 }
 
 export const deleteRecord = async (id: number): Promise<void> => {
@@ -390,6 +410,7 @@ export const deleteRecord = async (id: number): Promise<void> => {
   
   // 成功后，清除所有记录缓存以便重新加载
   clearAllCachedRecords()
+  recordStore.clearAll()
 }
 
 // ============ 辅助函数 ============
@@ -432,8 +453,29 @@ export const getRecentRecordsByCategory = async (
       return []
     }
 
-    const response = await getRecords({ babyId: baby.id, category, limit, offset: 0 })
-    return response.records
+    // 先尝试从 recordStore 获取（从今天往前最多7天）
+    const cachedRecords = recordStore.getRecentRecordsByCategory(baby.id, category, limit)
+    if (cachedRecords && cachedRecords.length > 0) {
+      console.log(`[getRecentRecordsByCategory] 从 store 获取到 ${cachedRecords.length} 条记录`)
+      return cachedRecords
+    }
+
+    // 如果 store 中没有足够的数据，就请求服务器
+    // 请求最近30天的数据
+    const endDate = Date.now()
+    const startDate = endDate - 30 * 24 * 60 * 60 * 1000
+    
+    const response = await getRecords({ 
+      babyId: baby.id, 
+      category, 
+      limit: 100, // 获取足够多的数据
+      offset: 0,
+      startDate,
+      endDate
+    })
+    
+    // 取最近的 limit 条
+    return response.records.slice(0, limit)
   } catch (error) {
     console.error('获取最近记录失败:', error)
     return []

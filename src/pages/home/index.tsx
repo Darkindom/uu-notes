@@ -50,6 +50,8 @@ export default function HomePage() {
       const foodRecords = await getRecentRecordsByCategory('food', 1)
       if (foodRecords.length > 0) {
         setTimeSinceFood(calculateTimeDiff(foodRecords[0].startTime))
+      } else {
+        setTimeSinceFood('')
       }
 
       // 获取最近的拉记录，区分大便和换尿片
@@ -59,12 +61,16 @@ export default function HomePage() {
       const poopRecord = shitRecords.find((r) => r.subCategory === 'big')
       if (poopRecord) {
         setTimeSincePoop(calculateTimeDiff(poopRecord.startTime))
+      } else {
+        setTimeSincePoop('')
       }
 
       // 找最近的换尿片记录 (subCategory === 'small')
       const diaperRecord = shitRecords.find((r) => r.subCategory === 'small')
       if (diaperRecord) {
         setTimeSinceDiaper(calculateTimeDiff(diaperRecord.startTime))
+      } else {
+        setTimeSinceDiaper('')
       }
     } catch (error) {
       console.error('获取记录失败:', error)

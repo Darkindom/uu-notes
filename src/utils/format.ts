@@ -28,7 +28,7 @@ export const SUBCATEGORY_LABELS: { [key: string]: string } = {
   babycook: '辅食',
   sleep: '睡眠',
   big: '大便',
-  small: '小便',
+  small: '换尿片',
   tonic: '补剂',
   outdoor: '户外',
   cry: '哭闹',
@@ -80,7 +80,7 @@ export function formatRecordSummary(record: Record): string {
     return `${amount} ${color} ${hardness}`.trim()
   }
   if (sub === 'small') {
-    return `小便 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
+    return `换尿片 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
   }
   if (sub === 'tonic') {
     return `补剂 ${extra.tonic_type ?? ''}`
