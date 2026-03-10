@@ -263,6 +263,13 @@ export const deleteBaby = async (id: number): Promise<void> => {
   clearAllCachedRecords(id)
 }
 
+export const deleteBabyMember = async (babyId: number, userId: number): Promise<void> => {
+  await request({ url: `/babies/${babyId}/members/${userId}`, method: 'DELETE' })
+  
+  // 删除成员后，清除宝宝列表缓存
+  clearCachedBabies()
+}
+
 // ============ 记录相关 ============
 
 export interface Record {

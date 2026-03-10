@@ -573,6 +573,118 @@ app.delete('/api/babies/:id', verifyToken, (req, res) => {
   }
 })
 
+// 删除宝宝成员
+app.delete('/api/babies/:babyId/members/:userId', verifyToken, (req, res) => {
+  try {
+    const babyId = parseInt(req.params.babyId)
+    const memberUserId = parseInt(req.params.userId)
+
+    // 检查宝宝是否存在
+    const baby = db.prepare('SELECT * FROM babies WHERE id = ?').get(babyId)
+    if (!baby) {
+      return res.status(404).json({ error: '宝宝不存在' })
+    }
+
+    // 检查权限：只有创建者可以删除成员
+    if (baby.creatorId !== req.userId) {
+      return res.status(403).json({ error: '只有创建者可以删除成员' })
+    }
+
+    // 检查要删除的成员是否存在
+    const memberIds = baby.memberIds ? JSON.parse(baby.memberIds) : []
+    if (!memberIds.includes(memberUserId)) {
+      return res.status(404).json({ error: '该成员不存在于宝宝列表中' })
+    }
+
+    // 如果删除的是创建者自己，需要将第二个成员提升为创建者
+    let newCreatorId = baby.creatorId
+    if (memberUserId === baby.creatorId) {
+      // 找到第二个成员（不是创建者的第一个成员）
+      const otherMembers = memberIds.filter(id => id !== memberUserId)
+      
+      if (otherMembers.length === 0) {
+        // 如果没有其他成员了，不允许删除自己（创建者）
+        return res.status(400).json({ error: '创建者是最后一个成员，无法删除。请先添加其他成员或删除整个宝宝。' })
+      }
+      
+      // 将第一个其他成员设置为新的创建者
+      newCreatorId = otherMembers[0]
+      
+      log('INFO', '创建者删除自己，提升新创建者', { 
+        babyId, 
+        oldCreatorId: memberUserId, 
+        newCreatorId 
+      })
+    }
+
+    // 从成员列表中移除该用户
+    const newMemberIds = memberIds.filter(id => id !== memberUserId)
+
+    // 更新宝宝的成员列表和创建者（如果需要）
+    const now = Date.now()
+    db.prepare(
+      `
+      UPDATE babies
+      SET memberIds = ?, creatorId = ?, updatedAt = ?
+      WHERE id = ?
+    `
+    ).run(JSON.stringify(newMemberIds), newCreatorId, now, babyId)
+
+    // 从 baby_members 表中删除关系记录
+    db.prepare('DELETE FROM baby_members WHERE babyId = ? AND userId = ?').run(babyId, memberUserId)
+
+    // 从被删除用户的宝宝列表中移除这个宝宝
+    const memberUser = db.prepare('SELECT babyIds, currentBabyId FROM users WHERE id = ?').get(memberUserId)
+    if (memberUser) {
+      const userBabyIds = memberUser.babyIds ? JSON.parse(memberUser.babyIds) : []
+      const newUserBabyIds = userBabyIds.filter(id => id !== babyId)
+      const newCurrentBabyId = memberUser.currentBabyId === babyId 
+        ? (newUserBabyIds[0] || null) 
+        : memberUser.currentBabyId
+
+      db.prepare(
+        `
+        UPDATE users
+        SET babyIds = ?, currentBabyId = ?, updatedAt = ?
+        WHERE id = ?
+      `
+      ).run(JSON.stringify(newUserBabyIds), newCurrentBabyId, now, memberUserId)
+    }
+
+    res.json({ 
+      success: true,
+      data: {
+        newCreatorId: newCreatorId !== baby.creatorId ? newCreatorId : undefined
+      }
+    })
+
+    // 清除相关用户的宝宝列表缓存
+    const creatorCacheKey = generateCacheKey('babies', { userId: req.userId })
+    const memberCacheKey = generateCacheKey('babies', { userId: memberUserId })
+    cache.del(creatorCacheKey)
+    cache.del(memberCacheKey)
+    
+    // 如果提升了新创建者，也清除新创建者的缓存
+    if (newCreatorId !== baby.creatorId) {
+      const newCreatorCacheKey = generateCacheKey('babies', { userId: newCreatorId })
+      cache.del(newCreatorCacheKey)
+    }
+
+    log('INFO', '删除宝宝成员成功', { 
+      babyId, 
+      deletedUserId: memberUserId, 
+      newCreatorId: newCreatorId !== baby.creatorId ? newCreatorId : undefined 
+    })
+  } catch (error) {
+    log('ERROR', '删除宝宝成员失败', { 
+      error: error.message, 
+      babyId: req.params.babyId, 
+      userId: req.params.userId 
+    })
+    res.status(500).json({ error: '删除宝宝成员失败' })
+  }
+})
+
 // ============ 记录接口 ============
 
 app.get('/api/records/:id', verifyToken, (req, res) => {

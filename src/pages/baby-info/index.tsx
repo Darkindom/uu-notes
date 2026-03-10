@@ -7,6 +7,7 @@ import {
   switchBaby,
   getCurrentUser,
   deleteBaby,
+  deleteBabyMember,
   getRecords,
   type Baby,
 } from '../../utils/api'
@@ -645,6 +646,60 @@ export default function BabySelectorPage() {
     setShowMembersModal(true)
   }
 
+  async function handleDeleteMember(member: any, e: any) {
+    e.stopPropagation()
+
+    if (!selectedBaby) return
+
+    // 检查权限：只有创建者可以删除成员
+    if (selectedBaby.creatorId !== currentUserId) {
+      Taro.showModal({
+        title: '提示',
+        content: '仅宝宝创建者有删除权限',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+
+    // 二次确认
+    const res = await Taro.showModal({
+      title: '确认删除',
+      content: `确定要删除成员"${member.nickname}"吗？`,
+      confirmText: '删除',
+      cancelText: '取消',
+      confirmColor: '#ff4d4f',
+    })
+
+    if (!res.confirm) return
+
+    try {
+      Taro.showLoading({ title: '删除中...' })
+      await deleteBabyMember(selectedBaby.id, member.userId)
+      Taro.hideLoading()
+      Taro.showToast({ title: '删除成功', icon: 'success' })
+      
+      // 刷新宝宝列表
+      await loadBabies()
+      
+      // 更新弹窗中的宝宝信息
+      const updatedBabies = await getBabies()
+      const updatedBaby = updatedBabies.find((b) => b.id === selectedBaby.id)
+      if (updatedBaby) {
+        setSelectedBaby(updatedBaby)
+      } else {
+        // 如果宝宝不存在了（可能被删除），关闭弹窗
+        setShowMembersModal(false)
+      }
+    } catch (error: any) {
+      Taro.hideLoading()
+      Taro.showToast({
+        title: error.message || '删除失败',
+        icon: 'none',
+      })
+    }
+  }
+
   // 打开日历
   function handleOpenCalendar() {
     setShowCalendar(true)
@@ -944,6 +999,18 @@ export default function BabySelectorPage() {
                       <Text className='member-name'>{member.nickname}</Text>
                       <Text className='member-role'>{member.role}</Text>
                     </View>
+                    <View
+                      className={`delete-member-btn ${
+                        selectedBaby.creatorId !== currentUserId ? 'disabled' : ''
+                      }`}
+                      onClick={(e) => {
+                        if (selectedBaby.creatorId === currentUserId) {
+                          handleDeleteMember(member, e)
+                        }
+                      }}
+                    >
+                      <Text className='delete-member-text'>删除</Text>
+                    </View>
                   </View>
                 ))
               ) : (
@@ -956,6 +1023,7 @@ export default function BabySelectorPage() {
               <Button className='invite-btn' openType='share'>
                 邀请成员
               </Button>
+              <Text className='permission-hint'>仅宝宝创建者有删除权限</Text>
             </View>
           </View>
         </View>

@@ -521,9 +521,37 @@
     flex-shrink: 0;
   }
 
+  .delete-member-btn {
+    padding: 12px 28px;
+    background: #ff4d4f;
+    color: #fff;
+    border-radius: 16px;
+    font-size: 32px;
+    flex-shrink: 0;
+    transition: all 0.2s;
+
+    &:active {
+      opacity: 0.8;
+      transform: scale(0.95);
+    }
+
+    &.disabled {
+      background: #e0e0e0;
+      color: #999;
+      opacity: 0.6;
+    }
+  }
+
+  .delete-member-text {
+    font-size: 32px;
+  }
+
   .modal-footer {
     padding: 20px 28px;
     border-top: 3px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
 
   .invite-btn {
@@ -547,5 +575,12 @@
       opacity: 0.9;
       transform: scale(0.98);
     }
+  }
+
+  .permission-hint {
+    font-size: 28px;
+    color: #999;
+    text-align: center;
+    margin-top: -8px;
   }
 }
