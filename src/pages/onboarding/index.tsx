@@ -43,7 +43,34 @@ export default function OnboardingPage() {
       Taro.showToast({ title: '请输入您的昵称', icon: 'none' })
       return
     }
-    setStep(2)
+    
+    setLoading(true)
+    try {
+      // 1. 先登录获取 token
+      const user = await login()
+      if (!user) {
+        throw new Error('登录失败')
+      }
+
+      // 2. 更新用户昵称
+      await updateUser({ nickname })
+      
+      // 3. 检查是否有邀请参数
+      const inviteBabyId = Taro.getStorageSync('invite_baby_id')
+      
+      if (inviteBabyId) {
+        // 有邀请，跳转到加入宝宝页面
+        Taro.redirectTo({ url: `/pages/join-baby/index?babyId=${inviteBabyId}` })
+      } else {
+        // 没有邀请，继续创建宝宝流程
+        setStep(2)
+      }
+    } catch (error) {
+      console.error('更新用户信息失败:', error)
+      Taro.showToast({ title: '操作失败，请重试', icon: 'none' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleSubmit() {
@@ -132,7 +159,7 @@ export default function OnboardingPage() {
               </Picker>
             </View>
 
-            <Button className='submit-btn' onClick={handleNext}>
+            <Button className='submit-btn' onClick={handleNext} loading={loading}>
               下一步
             </Button>
           </>

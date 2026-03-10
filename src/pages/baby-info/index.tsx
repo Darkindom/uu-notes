@@ -74,12 +74,12 @@ export default function BabySelectorPage() {
     if (!selectedBaby) {
       return {
         title: '宝宝成长记录',
-        path: '/pages/home/index',
+        path: '/pages/index/index',
       }
     }
     return {
       title: `邀请你加入「${selectedBaby.name}」的成长记录`,
-      path: `/pages/home/index?babyId=${selectedBaby.id}&inviteFrom=share`,
+      path: `/pages/index/index?babyId=${selectedBaby.id}&inviteFrom=share`,
     }
   })
 

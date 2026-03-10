@@ -685,6 +685,84 @@ app.delete('/api/babies/:babyId/members/:userId', verifyToken, (req, res) => {
   }
 })
 
+// 加入宝宝（通过邀请）
+app.post('/api/babies/:babyId/join', verifyToken, (req, res) => {
+  try {
+    const babyId = parseInt(req.params.babyId)
+    const { role } = req.body
+
+    // 检查宝宝是否存在
+    const baby = db.prepare('SELECT * FROM babies WHERE id = ?').get(babyId)
+    if (!baby) {
+      return res.status(404).json({ error: '宝宝不存在' })
+    }
+
+    // 检查用户是否已经是成员
+    const memberIds = baby.memberIds ? JSON.parse(baby.memberIds) : []
+    if (memberIds.includes(req.userId)) {
+      return res.status(400).json({ error: '您已经是该宝宝的成员' })
+    }
+
+    // 将用户添加到宝宝的成员列表
+    const newMemberIds = [...memberIds, req.userId]
+    const now = Date.now()
+
+    db.prepare(
+      `
+      UPDATE babies
+      SET memberIds = ?, updatedAt = ?
+      WHERE id = ?
+    `
+    ).run(JSON.stringify(newMemberIds), now, babyId)
+
+    // 添加成员关系记录
+    db.prepare(
+      `
+      INSERT INTO baby_members (babyId, userId, role, createdAt)
+      VALUES (?, ?, ?, ?)
+    `
+    ).run(babyId, req.userId, role || '家长', now)
+
+    // 更新用户的宝宝列表
+    const user = db.prepare('SELECT babyIds, currentBabyId FROM users WHERE id = ?').get(req.userId)
+    const userBabyIds = user.babyIds ? JSON.parse(user.babyIds) : []
+    userBabyIds.push(babyId)
+
+    db.prepare(
+      `
+      UPDATE users
+      SET babyIds = ?, currentBabyId = ?, updatedAt = ?
+      WHERE id = ?
+    `
+    ).run(JSON.stringify(userBabyIds), user.currentBabyId || babyId, now, req.userId)
+
+    res.json({ 
+      success: true,
+      data: {
+        babyId,
+        role: role || '家长'
+      }
+    })
+
+    // 清除相关缓存
+    const userCacheKey = generateCacheKey('babies', { userId: req.userId })
+    cache.del(userCacheKey)
+
+    log('INFO', '用户加入宝宝成功', { 
+      babyId, 
+      userId: req.userId, 
+      role: role || '家长' 
+    })
+  } catch (error) {
+    log('ERROR', '加入宝宝失败', { 
+      error: error.message, 
+      babyId: req.params.babyId, 
+      userId: req.userId 
+    })
+    res.status(500).json({ error: '加入宝宝失败' })
+  }
+})
+
 // ============ 记录接口 ============
 
 app.get('/api/records/:id', verifyToken, (req, res) => {

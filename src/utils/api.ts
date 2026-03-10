@@ -270,6 +270,14 @@ export const deleteBabyMember = async (babyId: number, userId: number): Promise<
   clearCachedBabies()
 }
 
+export const joinBaby = async (babyId: number, role: string): Promise<void> => {
+  await request({ url: `/babies/${babyId}/join`, method: 'POST', data: { role } })
+  
+  // 加入宝宝后，清除宝宝列表和用户缓存
+  clearCachedBabies()
+  clearCachedCurrentUser()
+}
+
 // ============ 记录相关 ============
 
 export interface Record {
