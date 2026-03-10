@@ -40,6 +40,42 @@
   display: block;
 }
 
+.voice-record-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C5A 100%);
+  border-radius: 32px;
+  padding: 40px 32px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(255, 107, 53, 0.3);
+  transition: all 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: 0 4px 16px rgba(255, 107, 53, 0.3);
+  }
+
+  .voice-icon {
+    font-size: 72px;
+    margin-bottom: 12px;
+  }
+
+  .voice-text {
+    font-size: 48px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 8px;
+  }
+
+  .voice-hint {
+    font-size: 24px;
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

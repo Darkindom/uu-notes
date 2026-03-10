@@ -481,3 +481,8 @@ export const getRecentRecordsByCategory = async (
     return []
   }
 }
+
+// ============ 语音识别相关 ============
+
+// 导出 AI Agent 相关类型和函数
+export { analyzeVoiceText, type VoiceAnalysisResult } from './aiAgent'

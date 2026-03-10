@@ -1,5 +1,5 @@
 import { PropsWithChildren } from 'react'
-import { useLaunch } from '@tarojs/taro'
+import Taro, { useLaunch } from '@tarojs/taro'
 
 import './app.less'
 
@@ -15,6 +15,19 @@ function App({ children }: PropsWithChildren<any>) {
     // 数据库: SQLite (NAS 本地存储)
     // 认证方式: JWT Token
     // ========================================
+
+    // 初始化云开发（仅用于 AI Agent）
+    try {
+      if (Taro.cloud && Taro.cloud.init) {
+        Taro.cloud.init({
+          env: 'cloudbase-0gom0wo33480db9c',
+          traceUser: true,
+        })
+        console.log('云开发初始化成功（用于 AI Agent）')
+      }
+    } catch (error) {
+      console.error('云开发初始化失败:', error)
+    }
   })
 
   // children 是将要会渲染的页面

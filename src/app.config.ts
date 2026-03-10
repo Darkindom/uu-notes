@@ -11,6 +11,7 @@ export default defineAppConfig({
     'pages/sleep/index',
     'pages/shit/index',
     'pages/other/index',
+    'pages/voice-record/index',
   ],
   window: {
     backgroundTextStyle: 'light',
@@ -38,5 +39,16 @@ export default defineAppConfig({
         text: '宝宝',
       },
     ],
+  },
+  plugins: {
+    WechatSI: {
+      version: '0.3.5',
+      provider: 'wx069ba97219f66d99',
+    },
+  },
+  permission: {
+    'scope.record': {
+      desc: '需要使用您的麦克风进行语音识别',
+    },
   },
 })
