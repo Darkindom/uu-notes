@@ -40,6 +40,12 @@ interface TodayStats {
   nightMilkCount: number // 夜奶次数
 }
 
+interface WeeklyFoodData {
+  dayName: string // 周一、周二...
+  foods: string[] // 辅食列表
+  hasData: boolean
+}
+
 export default function BabySelectorPage() {
   const [babies, setBabies] = useState<Baby[]>([])
   const [currentBabyId, setCurrentBabyId] = useState<number | undefined>(undefined)
@@ -53,6 +59,8 @@ export default function BabySelectorPage() {
   const [showCalendar, setShowCalendar] = useState(false)
   const [weeklyData, setWeeklyData] = useState<DayData[]>([])
   const [chartLoading, setChartLoading] = useState(false)
+  const [weeklyFoodData, setWeeklyFoodData] = useState<WeeklyFoodData[]>([])
+  const [foodDataLoading, setFoodDataLoading] = useState(false)
 
   useLoad(async () => {
     await loadBabies()
@@ -64,6 +72,7 @@ export default function BabySelectorPage() {
       Promise.all([
         loadTodayStats(currentBabyId, selectedDate),
         loadWeeklyData(currentBabyId),
+        loadWeeklyFoodData(currentBabyId),
       ]).catch((error) => {
         console.error('加载数据失败:', error)
       })
@@ -97,6 +106,7 @@ export default function BabySelectorPage() {
         Promise.all([
           loadTodayStats(user.currentBabyId, selectedDate),
           loadWeeklyData(user.currentBabyId),
+          loadWeeklyFoodData(user.currentBabyId),
         ]).catch((error) => {
           console.error('加载数据失败:', error)
         })
@@ -519,6 +529,80 @@ export default function BabySelectorPage() {
       setWeeklyData([])
     } finally {
       setChartLoading(false)
+    }
+  }
+
+  async function loadWeeklyFoodData(babyId: number) {
+    try {
+      setFoodDataLoading(true)
+
+      const weekFoodData: WeeklyFoodData[] = []
+      const today = new Date()
+      
+      // 获取本周一的日期
+      const currentDay = today.getDay()
+      const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay
+      const monday = new Date(today)
+      monday.setDate(today.getDate() + diffToMonday)
+      monday.setHours(0, 0, 0, 0)
+
+      const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(monday)
+        date.setDate(monday.getDate() + i)
+        
+        // 只加载到今天为止
+        if (date > today) {
+          break
+        }
+        
+        const startOfDay = new Date(date)
+        startOfDay.setHours(0, 0, 0, 0)
+        const endOfDay = new Date(date)
+        endOfDay.setHours(23, 59, 59, 999)
+
+        try {
+          const response = await getRecords({
+            babyId,
+            limit: 1000,
+            offset: 0,
+            startDate: startOfDay.getTime(),
+            endDate: endOfDay.getTime(),
+          })
+
+          const foods: string[] = []
+          
+          response.records.forEach((record) => {
+            if (record.category === 'food' && record.subCategory === 'babycook') {
+              const foodType = record.extra?.food_type
+              if (foodType) {
+                foods.push(foodType)
+              }
+            }
+          })
+
+          weekFoodData.push({
+            dayName: dayNames[i],
+            foods,
+            hasData: foods.length > 0,
+          })
+        } catch (error) {
+          console.error(`获取 ${dayNames[i]} 辅食数据失败:`, error)
+          weekFoodData.push({
+            dayName: dayNames[i],
+            foods: [],
+            hasData: false,
+          })
+        }
+      }
+
+      setWeeklyFoodData(weekFoodData)
+    } catch (error) {
+      console.error('加载本周辅食数据失败:', error)
+      setWeeklyFoodData([])
+    } finally {
+      setFoodDataLoading(false)
     }
   }
 
@@ -956,6 +1040,32 @@ export default function BabySelectorPage() {
                       )}
                   </>
                 )}
+              </View>
+            </View>
+          )}
+
+          {/* 本周辅食情况 */}
+          {currentBabyId && weeklyFoodData.some((day) => day.hasData) && (
+            <View className='weekly-food-section'>
+              <View className='weekly-food-header'>
+                <Text className='weekly-food-title'>本周辅食情况</Text>
+                {foodDataLoading && <LoadingSpinner size='small' color='#999' />}
+              </View>
+              <View className='weekly-food-content'>
+                {weeklyFoodData.map((dayData, index) => (
+                  <View key={index} className='food-day-item'>
+                    <View className='food-day-label'>
+                      <Text className='food-day-name'>{dayData.dayName}</Text>
+                    </View>
+                    <View className='food-day-content'>
+                      {dayData.hasData ? (
+                        <Text className='food-day-text'>{dayData.foods.join('、')}</Text>
+                      ) : (
+                        <Text className='food-day-empty'>—</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
           )}
