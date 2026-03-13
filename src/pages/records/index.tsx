@@ -3,7 +3,7 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import dayjs from 'dayjs'
 import { getRecords, deleteRecord, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
-import { formatTimestamp, formatRecordSummary, CATEGORY_LABELS } from '../../utils/format'
+import { formatTimestamp, formatRecordSummary, getFoodTypeDetail, CATEGORY_LABELS } from '../../utils/format'
 import { clearCachedRecords } from '../../utils/cache'
 import Calendar from '../../components/Calendar'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -620,6 +620,11 @@ export default function RecordsPage() {
                           </View>
                         </View>
                       </View>
+                      {getFoodTypeDetail(record) && (
+                        <View className='record-detail-row'>
+                          <Text className='record-detail'>{getFoodTypeDetail(record)}</Text>
+                        </View>
+                      )}
                       <View className='record-sub-row'>
                         <Text className='record-time'>{formatTimestamp(record.startTime)}</Text>
                         <Text className='record-reporter'>

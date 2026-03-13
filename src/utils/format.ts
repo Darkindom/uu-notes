@@ -63,8 +63,7 @@ export function formatRecordSummary(record: Record): string {
     return `喝水 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
   }
   if (sub === 'babycook') {
-    const food = extra.food_type ? `(${extra.food_type})` : ''
-    return `辅食${food} ${AMOUNT_LABELS[parseInt(val)] ?? val}`
+    return `辅食 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
   }
   if (sub === 'sleep') {
     const mins = parseInt(val)
@@ -130,4 +129,14 @@ export function timestampToDateTime(ts: number): { date: string; time: string } 
     date: `${year}-${month}-${day}`,
     time: `${hours}:${mins}`,
   }
+}
+
+export function getFoodTypeDetail(record: Record): string {
+  const sub = record.subCategory || ''
+  const extra = (record.extra as any) || {}
+  
+  if (sub === 'babycook' && extra.food_type) {
+    return extra.food_type
+  }
+  return ''
 }
