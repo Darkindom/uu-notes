@@ -1,21 +1,30 @@
 import { View, Text, Input, Button, Picker } from '@tarojs/components'
 import Taro, { useLoad, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
-import { updateBaby } from '../../utils/api'
+import { updateBaby, updateBabyMemberRole, getCurrentUser, getBabies, type Baby } from '../../utils/api'
 import { clearIndexCache } from '../../utils/cache'
 import './index.less'
+
+const ROLES = ['妈妈', '爸爸', '奶奶', '爷爷', '外婆', '外公', '其他']
 
 export default function EditBabyPage() {
   const router = useRouter()
   const [babyId, setBabyId] = useState<number | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   
   const [loading, setLoading] = useState(false)
   const [babyName, setBabyName] = useState('')
   const [gender, setGender] = useState<'male' | 'female'>('male')
   const [birthday, setBirthday] = useState('')
+  const [role, setRole] = useState('妈妈')
+  const [roleIdx, setRoleIdx] = useState(0)
 
   useLoad(async () => {
     try {
+      // 获取当前用户信息
+      const user = await getCurrentUser()
+      setCurrentUserId(user.id)
+
       // 从 URL 参数中获取宝宝数据
       const dataParam = router.params.data
       if (!dataParam) {
@@ -38,6 +47,18 @@ export default function EditBabyPage() {
       setGender(babyData.gender as 'male' | 'female')
       const birthDate = new Date(babyData.birthday)
       setBirthday(`${birthDate.getFullYear()}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`)
+
+      // 获取当前用户在该宝宝中的角色
+      const babies = await getBabies()
+      const currentBaby = babies.find((b) => b.id === babyData.id)
+      if (currentBaby && currentBaby.members) {
+        const currentMember = currentBaby.members.find((m) => m.userId === user.id)
+        if (currentMember && currentMember.role) {
+          setRole(currentMember.role)
+          const idx = ROLES.indexOf(currentMember.role)
+          setRoleIdx(idx >= 0 ? idx : 0)
+        }
+      }
     } catch (error) {
       console.error('加载宝宝信息失败:', error)
       Taro.showToast({ title: '数据解析失败', icon: 'none' })
@@ -46,7 +67,7 @@ export default function EditBabyPage() {
   })
 
   async function handleSubmit() {
-    if (!babyId) {
+    if (!babyId || !currentUserId) {
       Taro.showToast({ title: '宝宝信息加载失败', icon: 'none' })
       return
     }
@@ -61,11 +82,15 @@ export default function EditBabyPage() {
 
     setLoading(true)
     try {
+      // 更新宝宝基本信息
       await updateBaby(babyId, {
         name: babyName,
         gender,
         birthday: new Date(birthday).getTime(),
       })
+      
+      // 更新当前用户的角色
+      await updateBabyMemberRole(babyId, currentUserId, role)
       
       // 清除首页缓存，强制重新加载新宝宝信息
       clearIndexCache()
@@ -128,6 +153,22 @@ export default function EditBabyPage() {
             <View className='picker-display'>
               {birthday || '请选择生日'}
             </View>
+          </Picker>
+        </View>
+
+        <View className='section'>
+          <Text className='field-label'>👨‍👩‍👧 您与宝宝的关系</Text>
+          <Picker
+            mode='selector'
+            range={ROLES}
+            value={roleIdx}
+            onChange={e => {
+              const idx = parseInt(String(e.detail.value))
+              setRoleIdx(idx)
+              setRole(ROLES[idx])
+            }}
+          >
+            <View className='picker-display'>{role}</View>
           </Picker>
         </View>
 

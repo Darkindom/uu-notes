@@ -15,8 +15,8 @@ const ENV = process.env.TARO_APP_ENV || 'prod' // 默认使用生产环境
 
 // API 配置 - 根据环境选择不同的 API 地址
 const API_CONFIG = {
-  // dev: 'http://localhost:1717/api', // 开发环境（本地服务器）
-  dev: 'https://dksiuu.top/api', // 开发环境
+  dev: 'http://localhost:1717/api', // 开发环境（本地服务器）
+  // dev: 'https://dksiuu.top/api', // 开发环境（远程服务器）
   test: 'https://dksiuu.top/api', // 测试环境
   prod: 'https://dksiuu.top/api', // 生产环境（正式发布使用）
 }
@@ -159,15 +159,15 @@ export interface User {
 
 export const getCurrentUser = async (): Promise<User> => {
   const cached = getCachedCurrentUser()
-  
+
   // 有缓存立即返回，同时在后台刷新
   if (cached) {
     request<User>({ url: '/user/current' })
       .then(setCachedCurrentUser)
-      .catch(err => console.error('后台更新用户数据失败:', err))
+      .catch((err) => console.error('后台更新用户数据失败:', err))
     return cached
   }
-  
+
   // 无缓存等待请求
   const user = await request<User>({ url: '/user/current' })
   setCachedCurrentUser(user)
@@ -180,7 +180,7 @@ export const updateUser = async (data: {
   currentBabyId?: number
 }): Promise<void> => {
   await request({ url: '/user/current', method: 'PUT', data })
-  
+
   // 更新用户信息后，清除用户缓存
   clearCachedCurrentUser()
 }
@@ -208,15 +208,15 @@ export interface Baby {
 
 export const getBabies = async (): Promise<Baby[]> => {
   const cached = getCachedBabies()
-  
+
   // 有缓存立即返回，同时在后台刷新
   if (cached) {
     request<Baby[]>({ url: '/babies' })
       .then(setCachedBabies)
-      .catch(err => console.error('后台更新宝宝列表失败:', err))
+      .catch((err) => console.error('后台更新宝宝列表失败:', err))
     return cached
   }
-  
+
   // 无缓存等待请求
   const babies = await request<Baby[]>({ url: '/babies' })
   setCachedBabies(babies)
@@ -231,11 +231,11 @@ export const createBaby = async (data: {
   role?: string
 }): Promise<Baby> => {
   const result = await request<Baby>({ url: '/babies', method: 'POST', data })
-  
+
   // 创建宝宝后，清除宝宝列表缓存
   clearCachedBabies()
   clearCachedCurrentUser()
-  
+
   return result
 }
 
@@ -249,14 +249,25 @@ export const updateBaby = async (
   },
 ): Promise<void> => {
   await request({ url: `/babies/${id}`, method: 'PUT', data })
-  
+
   // 更新宝宝后，清除宝宝列表缓存
+  clearCachedBabies()
+}
+
+export const updateBabyMemberRole = async (
+  babyId: number,
+  userId: number,
+  role: string,
+): Promise<void> => {
+  await request({ url: `/babies/${babyId}/members/${userId}`, method: 'PUT', data: { role } })
+
+  // 更新成员角色后，清除宝宝列表缓存
   clearCachedBabies()
 }
 
 export const deleteBaby = async (id: number): Promise<void> => {
   await request({ url: `/babies/${id}`, method: 'DELETE' })
-  
+
   // 删除宝宝后，清除相关缓存
   clearCachedBabies()
   clearCachedCurrentUser()
@@ -265,14 +276,14 @@ export const deleteBaby = async (id: number): Promise<void> => {
 
 export const deleteBabyMember = async (babyId: number, userId: number): Promise<void> => {
   await request({ url: `/babies/${babyId}/members/${userId}`, method: 'DELETE' })
-  
+
   // 删除成员后，清除宝宝列表缓存
   clearCachedBabies()
 }
 
 export const joinBaby = async (babyId: number, role: string): Promise<void> => {
   await request({ url: `/babies/${babyId}/join`, method: 'POST', data: { role } })
-  
+
   // 加入宝宝后，清除宝宝列表和用户缓存
   clearCachedBabies()
   clearCachedCurrentUser()
@@ -323,19 +334,22 @@ export const getRecords = async (params: {
   if (params.babyId && params.startDate && params.endDate) {
     const startDate = new Date(params.startDate)
     const endDate = new Date(params.endDate)
-    
+
     // 检查是否查询单天数据
-    const isSingleDay = 
+    const isSingleDay =
       startDate.getFullYear() === endDate.getFullYear() &&
       startDate.getMonth() === endDate.getMonth() &&
       startDate.getDate() === endDate.getDate()
-    
+
     if (isSingleDay) {
-      const dateKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
-      
+      const dateKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(
+        2,
+        '0',
+      )}-${String(startDate.getDate()).padStart(2, '0')}`
+
       // 先尝试从 recordStore 获取
       const cachedRecords = recordStore.getRecords(params.babyId, dateKey)
-      
+
       if (cachedRecords) {
         // 有缓存，立即返回，同时在后台刷新
         request<any>({ url: `/records${query ? '?' + query : ''}` })
@@ -343,33 +357,38 @@ export const getRecords = async (params: {
             const records = data.data || data
             recordStore.setRecords(params.babyId!, dateKey, records)
           })
-          .catch(err => console.error('[getRecords] 后台更新失败:', err))
-        
+          .catch((err) => console.error('[getRecords] 后台更新失败:', err))
+
         // 如果有 category 筛选，过滤结果
-        const filteredRecords = params.category 
-          ? cachedRecords.filter(r => r.category === params.category)
+        const filteredRecords = params.category
+          ? cachedRecords.filter((r) => r.category === params.category)
           : cachedRecords
-        
+
         return {
           records: filteredRecords,
-          pagination: { total: filteredRecords.length, limit: params.limit || 20, offset: 0, hasMore: false },
+          pagination: {
+            total: filteredRecords.length,
+            limit: params.limit || 20,
+            offset: 0,
+            hasMore: false,
+          },
         }
       }
-      
+
       // 无缓存，等待请求
       const data = await request<any>({ url: `/records${query ? '?' + query : ''}` })
       const records = data.data || data
-      
+
       // 存入 recordStore
       recordStore.setRecords(params.babyId, dateKey, records)
-      
+
       return {
         records,
         pagination: data.pagination || { total: 0, limit: 20, offset: 0, hasMore: false },
       }
     }
   }
-  
+
   // 跨天查询或没有缓存条件，直接请求
   const data = await request<any>({ url: `/records${query ? '?' + query : ''}` })
   return {
@@ -393,11 +412,11 @@ export const createRecord = async (data: {
   note?: string
 }): Promise<Record> => {
   const result = await request<Record>({ url: '/records', method: 'POST', data })
-  
+
   // 成功后，清除相关日期的缓存以便重新加载
   clearAllCachedRecords(data.babyId)
   recordStore.clearBabyRecords(data.babyId)
-  
+
   return result
 }
 
@@ -414,7 +433,7 @@ export const updateRecord = async (
   },
 ): Promise<void> => {
   await request({ url: `/records/${id}`, method: 'PUT', data })
-  
+
   // 成功后，清除所有记录缓存以便重新加载
   clearAllCachedRecords()
   recordStore.clearAll()
@@ -422,7 +441,7 @@ export const updateRecord = async (
 
 export const deleteRecord = async (id: number): Promise<void> => {
   await request({ url: `/records/${id}`, method: 'DELETE' })
-  
+
   // 成功后，清除所有记录缓存以便重新加载
   clearAllCachedRecords()
   recordStore.clearAll()
@@ -479,16 +498,16 @@ export const getRecentRecordsByCategory = async (
     // 请求最近30天的数据
     const endDate = Date.now()
     const startDate = endDate - 30 * 24 * 60 * 60 * 1000
-    
-    const response = await getRecords({ 
-      babyId: baby.id, 
-      category, 
+
+    const response = await getRecords({
+      babyId: baby.id,
+      category,
       limit: 100, // 获取足够多的数据
       offset: 0,
       startDate,
-      endDate
+      endDate,
     })
-    
+
     // 取最近的 limit 条
     return response.records.slice(0, limit)
   } catch (error) {
