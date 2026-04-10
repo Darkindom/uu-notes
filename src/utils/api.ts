@@ -14,6 +14,7 @@ import { recordStore } from '../store/recordStore'
 const ENV = process.env.TARO_APP_ENV || 'prod' // 默认使用生产环境
 
 // API 配置 - 根据环境选择不同的 API 地址
+// dev 使用本机 localhost：仅开发者工具本机预览可用；真机扫码时请求发到手机自身，会失败。真机调邀请/登录请用 dev:weapp:prod 或 test。
 const API_CONFIG = {
   dev: 'http://localhost:1717/api', // 开发环境（本地服务器）
   // dev: 'https://dksiuu.top/api', // 开发环境（远程服务器）
