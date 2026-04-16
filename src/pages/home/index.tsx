@@ -19,7 +19,8 @@ export default function HomePage() {
     return cache?.name || ''
   })
   const [timeSinceFood, setTimeSinceFood] = useState<string>('')
-  const [timeSinceShit, setTimeSinceShit] = useState<string>('')
+  const [timeSinceDiaper, setTimeSinceDiaper] = useState<string>('')
+  const [timeSincePoop, setTimeSincePoop] = useState<string>('')
 
   // 计算时间差
   const calculateTimeDiff = (timestamp: number): string => {
@@ -53,13 +54,17 @@ export default function HomePage() {
         setTimeSinceFood('')
       }
 
-      // 获取最近的拉记录（不区分大便和换尿片）
-      const shitRecords = await getRecentRecordsByCategory('shit', 1)
-      if (shitRecords.length > 0) {
-        setTimeSinceShit(calculateTimeDiff(shitRecords[0].startTime))
-      } else {
-        setTimeSinceShit('')
+      // 分别取最近一次换尿片、大便（subCategory: small / big）
+      const shitRecords = await getRecentRecordsByCategory('shit', 50)
+      let lastDiaper: (typeof shitRecords)[0] | undefined
+      let lastPoop: (typeof shitRecords)[0] | undefined
+      for (const r of shitRecords) {
+        if (r.subCategory === 'small' && !lastDiaper) lastDiaper = r
+        if (r.subCategory === 'big' && !lastPoop) lastPoop = r
+        if (lastDiaper && lastPoop) break
       }
+      setTimeSinceDiaper(lastDiaper ? calculateTimeDiff(lastDiaper.startTime) : '')
+      setTimeSincePoop(lastPoop ? calculateTimeDiff(lastPoop.startTime) : '')
     } catch (error) {
       console.error('获取记录失败:', error)
     }
@@ -139,13 +144,22 @@ export default function HomePage() {
               <Text className='hint-time'>{timeSinceFood}</Text>
             </View>
           )}
-          {timeSinceShit && (
+          {timeSinceDiaper && (
             <View className='hint-item'>
               <View className='hint-label'>
                 <Text className='hint-label-light'>距上次</Text>
-                <Text className='hint-label-poop'>拉</Text>
+                <Text className='hint-label-diaper'>换尿片</Text>
               </View>
-              <Text className='hint-time'>{timeSinceShit}</Text>
+              <Text className='hint-time'>{timeSinceDiaper}</Text>
+            </View>
+          )}
+          {timeSincePoop && (
+            <View className='hint-item'>
+              <View className='hint-label'>
+                <Text className='hint-label-light'>距上次</Text>
+                <Text className='hint-label-poop'>大便</Text>
+              </View>
+              <Text className='hint-time'>{timeSincePoop}</Text>
             </View>
           )}
         </View>
