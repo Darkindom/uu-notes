@@ -1,5 +1,5 @@
 import { View, Text } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import { getCurrentBaby, checkLogin, getRecentRecordsByCategory } from '../../utils/api'
 import { getIndexCache, setIndexCache, clearIndexCache } from '../../utils/cache'
@@ -21,6 +21,12 @@ export default function HomePage() {
   const [timeSinceFood, setTimeSinceFood] = useState<string>('')
   const [timeSinceDiaper, setTimeSinceDiaper] = useState<string>('')
   const [timeSincePoop, setTimeSincePoop] = useState<string>('')
+
+  // 仅分享小程序入口，不带宝宝邀请参数（邀请只在「宝宝」页）
+  useShareAppMessage(() => ({
+    title: 'UU宝宝日记',
+    path: '/pages/index/index',
+  }))
 
   // 计算时间差
   const calculateTimeDiff = (timestamp: number): string => {

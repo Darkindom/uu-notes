@@ -1,9 +1,14 @@
 import { View, Text, ScrollView } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import dayjs from 'dayjs'
 import { getRecords, deleteRecord, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
-import { formatTimestamp, formatRecordSummary, getFoodTypeDetail, CATEGORY_LABELS } from '../../utils/format'
+import {
+  formatTimestamp,
+  formatRecordSummary,
+  getFoodTypeDetail,
+  CATEGORY_LABELS,
+} from '../../utils/format'
 import { clearCachedRecords } from '../../utils/cache'
 import Calendar from '../../components/Calendar'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -69,6 +74,12 @@ export default function RecordsPage() {
   })
   const [showCalendar, setShowCalendar] = useState(false)
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null)
+
+  // 仅分享小程序入口，不带宝宝邀请参数（邀请只在「宝宝」页）
+  useShareAppMessage(() => ({
+    title: 'UU宝宝日记',
+    path: '/pages/index/index',
+  }))
 
   // 初始加载
   useDidShow(async () => {
@@ -565,7 +576,9 @@ export default function RecordsPage() {
                       todayStats.milk === 0 &&
                       todayStats.food === 0) ||
                       (categoryFilter === 'sleep' && todayStats.sleep === 0) ||
-                      (categoryFilter === 'shit' && todayStats.diaper === 0 && todayStats.poop === 0) ||
+                      (categoryFilter === 'shit' &&
+                        todayStats.diaper === 0 &&
+                        todayStats.poop === 0) ||
                       (categoryFilter === 'other' &&
                         todayStats.outdoor === 0 &&
                         todayStats.tonic === 0 &&
