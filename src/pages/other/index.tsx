@@ -45,6 +45,14 @@ function getTemperatureStatus(
     return null
   }
 
+  if (temperature < 36) {
+    return {
+      level: 'normal',
+      label: ' 低温',
+      message: '宝宝体温较低，是否测量错误？建议重新测量一次',
+    }
+  }
+
   if (temperature < 37.5) {
     return {
       level: 'normal',
