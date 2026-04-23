@@ -42,9 +42,9 @@ export default function HomePage() {
     }
 
     const parts: string[] = []
-    if (days > 0) parts.push(`${days} 天`)
-    if (hours > 0) parts.push(`${hours} 时`)
-    if (minutes > 0) parts.push(`${minutes} 分`)
+    if (days > 0) parts.push(`${days}天`)
+    if (hours > 0) parts.push(`${hours}时`)
+    if (days === 0 && minutes > 0) parts.push(`${minutes}分`)
 
     return parts.length > 0 ? parts.join(' ') : '刚刚'
   }

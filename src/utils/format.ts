@@ -33,6 +33,8 @@ export const SUBCATEGORY_LABELS: { [key: string]: string } = {
   outdoor: '户外',
   cry: '哭闹',
   gear: '护具',
+  medicine: '药',
+  temperature: '体温',
 }
 
 export const CATEGORY_LABELS: { [key: string]: string } = {
@@ -97,6 +99,12 @@ export function formatRecordSummary(record: Record): string {
     const growthType = extra.growth_type ?? ''
     const unit = growthType === '身高' ? 'cm' : 'kg'
     return `${growthType} ${val}${unit}`
+  }
+  if (sub === 'medicine') {
+    return `药 ${val}${extra.medicine_amount ? ` ${extra.medicine_amount}` : ''}`.trim()
+  }
+  if (sub === 'temperature') {
+    return `体温 ${val}℃`
   }
   return SUBCATEGORY_LABELS[sub] ?? sub
 }

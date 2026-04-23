@@ -2,15 +2,31 @@ import { View, Text, Input, Picker, Button } from '@tarojs/components'
 import Taro, { useLoad, useRouter } from '@tarojs/taro'
 import { useState } from 'react'
 import dayjs from 'dayjs'
-import { createRecord, updateRecord, getRecentRecordsByCategory, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
-import { getCurrentDateTime, dateTimeToTimestamp, TONIC_TYPES, formatRecordSummary, timestampToDateTime } from '../../utils/format'
+import {
+  createRecord,
+  updateRecord,
+  getRecentRecordsByCategory,
+  getCurrentBaby,
+  type Record as ApiRecord,
+} from '../../utils/api'
+import {
+  getCurrentDateTime,
+  dateTimeToTimestamp,
+  TONIC_TYPES,
+  formatRecordSummary,
+  timestampToDateTime,
+} from '../../utils/format'
 import Calendar from '../../components/Calendar'
 import './index.less'
 
-type SubType = 'tonic' | 'growth' | 'outdoor' | 'cry' | 'gear'
+type SubType = 'tonic' | 'growth' | 'outdoor' | 'cry' | 'gear' | 'medicine' | 'temperature'
+
+type TemperatureLevel = 'normal' | 'low' | 'medium' | 'high' | 'ultra'
 
 const SUB_MENUS: { label: string; value: SubType }[] = [
   { label: '补剂', value: 'tonic' },
+  { label: '药', value: 'medicine' },
+  { label: '体温', value: 'temperature' },
   { label: '成长', value: 'growth' },
   { label: '户外', value: 'outdoor' },
   { label: '哭闹', value: 'cry' },
@@ -19,6 +35,62 @@ const SUB_MENUS: { label: string; value: SubType }[] = [
 
 const GEAR_TYPES = ['带上', '脱下']
 const GROWTH_TYPES = ['身高', '体重']
+
+function getTemperatureStatus(
+  tempValue: string,
+): { level: TemperatureLevel; label: string; message: string } | null {
+  const temperature = Number.parseFloat(tempValue)
+
+  if (Number.isNaN(temperature)) {
+    return null
+  }
+
+  if (temperature < 37.5) {
+    return {
+      level: 'normal',
+      label: '正常',
+      message: '宝宝体温很健康，继续正常观察就可以。',
+    }
+  }
+
+  if (temperature < 38) {
+    return {
+      level: 'low',
+      label: '低烧',
+      message: '宝宝有点低烧，先多休息、适当补充水分，并继续观察体温变化。',
+    }
+  }
+
+  if (temperature < 38.5) {
+    return {
+      level: 'medium',
+      label: '中烧',
+      message: '宝宝已经中烧了，建议及时物理降温，并密切观察精神状态和食欲。',
+    }
+  }
+
+  if (temperature < 41) {
+    return {
+      level: 'high',
+      label: '高烧',
+      message: '宝宝高烧了，要进行降温处理，最好去医院。',
+    }
+  }
+
+  return {
+    level: 'ultra',
+    label: '超高烧',
+    message: '宝宝超高烧了，必须马上去医院。',
+  }
+}
+
+function getPrefillLabel(record: ApiRecord): string {
+  if (record.subCategory === 'medicine') {
+    return record.value || '未命名药品'
+  }
+
+  return formatRecordSummary(record)
+}
 
 export default function OtherPage() {
   const router = useRouter()
@@ -33,6 +105,9 @@ export default function OtherPage() {
   const [gearType, setGearType] = useState(GEAR_TYPES[0])
   const [growthType, setGrowthType] = useState(GROWTH_TYPES[0])
   const [growthValue, setGrowthValue] = useState('')
+  const [medicineName, setMedicineName] = useState('')
+  const [medicineAmount, setMedicineAmount] = useState('')
+  const [temperature, setTemperature] = useState('')
   const [duration, setDuration] = useState('')
   const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -40,15 +115,14 @@ export default function OtherPage() {
 
   useLoad(async () => {
     try {
-      // 如果是编辑模式，从缓存读取记录详情
       if (isEdit && editId) {
         const record = Taro.getStorageSync('editRecord')
         if (record && record.id === editId) {
-          const dt = timestampToDateTime(record.startTime)
-          setDate(dt.date)
-          setTime(dt.time)
+          const recordDateTime = timestampToDateTime(record.startTime)
+          setDate(recordDateTime.date)
+          setTime(recordDateTime.time)
           setSubType(record.subCategory as SubType)
-          
+
           if (record.subCategory === 'tonic' && record.extra) {
             setTonicType(record.extra.tonic_type || TONIC_TYPES[0])
           } else if (record.subCategory === 'gear' && record.extra) {
@@ -56,80 +130,72 @@ export default function OtherPage() {
           } else if (record.subCategory === 'growth' && record.extra) {
             setGrowthType(record.extra.growth_type || GROWTH_TYPES[0])
             setGrowthValue(record.value || '')
+          } else if (record.subCategory === 'medicine') {
+            setMedicineName(record.value || '')
+            setMedicineAmount(record.extra?.medicine_amount || '')
+          } else if (record.subCategory === 'temperature') {
+            setTemperature(record.value || '')
           } else {
             setDuration(record.value || '')
           }
         }
       }
 
-      const records = await getRecentRecordsByCategory('other', 5)
-      // 去重：使用 formatRecordSummary 生成的摘要作为唯一标识
-      const uniqueRecords: ApiRecord[] = []
-      const seen = new Set<string>()
-      
-      for (const record of records) {
-        const summary = formatRecordSummary(record)
-        if (!seen.has(summary)) {
-          seen.add(summary)
-          uniqueRecords.push(record)
-        }
-      }
-      
-      setRecentRecords(uniqueRecords)
+      const records = await getRecentRecordsByCategory('other', 50)
+      setRecentRecords(records)
     } catch (error) {
       console.error('加载数据失败:', error)
     }
   })
 
-  function applyPrefill(r: ApiRecord) {
-    const sub = r.subCategory as SubType
-    setSubType(sub)
-    if (sub === 'tonic') {
-      try {
-        const extra = r.extra as any
-        setTonicType(extra?.tonic_type ?? TONIC_TYPES[0])
-      } catch {
-        setTonicType(TONIC_TYPES[0])
-      }
-      setDuration('')
-      setGrowthValue('')
-      setGearType(GEAR_TYPES[0])
-      setGrowthType(GROWTH_TYPES[0])
-    } else if (sub === 'gear') {
-      try {
-        const extra = r.extra as any
-        setGearType(extra?.gear_type ?? GEAR_TYPES[0])
-      } catch {
-        setGearType(GEAR_TYPES[0])
-      }
-      setDuration('')
-      setGrowthValue('')
-      setTonicType(TONIC_TYPES[0])
-      setGrowthType(GROWTH_TYPES[0])
-    } else if (sub === 'growth') {
-      try {
-        const extra = r.extra as any
-        setGrowthType(extra?.growth_type ?? GROWTH_TYPES[0])
-        setGrowthValue(r.value || '')
-      } catch {
-        setGrowthType(GROWTH_TYPES[0])
-        setGrowthValue(r.value || '')
-      }
-      setDuration('')
-      setTonicType(TONIC_TYPES[0])
-      setGearType(GEAR_TYPES[0])
-    } else {
-      setDuration(r.value || '')
-      setGrowthValue('')
-      setTonicType(TONIC_TYPES[0])
-      setGearType(GEAR_TYPES[0])
-      setGrowthType(GROWTH_TYPES[0])
+  function resetSharedFields() {
+    setDuration('')
+    setGrowthValue('')
+    setMedicineName('')
+    setMedicineAmount('')
+    setTemperature('')
+    setTonicType(TONIC_TYPES[0])
+    setGearType(GEAR_TYPES[0])
+    setGrowthType(GROWTH_TYPES[0])
+  }
+
+  function applyPrefill(record: ApiRecord) {
+    const nextSubType = record.subCategory as SubType
+    setSubType(nextSubType)
+    resetSharedFields()
+
+    if (nextSubType === 'tonic') {
+      setTonicType(record.extra?.tonic_type ?? TONIC_TYPES[0])
+      return
     }
+
+    if (nextSubType === 'gear') {
+      setGearType(record.extra?.gear_type ?? GEAR_TYPES[0])
+      return
+    }
+
+    if (nextSubType === 'growth') {
+      setGrowthType(record.extra?.growth_type ?? GROWTH_TYPES[0])
+      setGrowthValue(record.value || '')
+      return
+    }
+
+    if (nextSubType === 'medicine') {
+      setMedicineName(record.value || '')
+      return
+    }
+
+    if (nextSubType === 'temperature') {
+      setTemperature(record.value || '')
+      return
+    }
+
+    setDuration(record.value || '')
   }
 
   async function handleSubmit() {
-    if (loading) return // 防止重复提交
-    
+    if (loading) return
+
     let value = ''
     let extra: any = null
 
@@ -146,6 +212,30 @@ export default function OtherPage() {
       }
       value = growthValue
       extra = { growth_type: growthType }
+    } else if (subType === 'medicine') {
+      if (!medicineName) {
+        Taro.showToast({ title: '请输入药品名称', icon: 'none' })
+        return
+      }
+      if (!medicineAmount) {
+        Taro.showToast({ title: '请输入药量', icon: 'none' })
+        return
+      }
+      value = medicineName
+      extra = { medicine_amount: medicineAmount }
+    } else if (subType === 'temperature') {
+      if (!temperature) {
+        Taro.showToast({ title: '请输入体温', icon: 'none' })
+        return
+      }
+
+      const parsedTemperature = Number.parseFloat(temperature)
+      if (Number.isNaN(parsedTemperature)) {
+        Taro.showToast({ title: '体温格式不正确', icon: 'none' })
+        return
+      }
+
+      value = temperature
     } else {
       if (!duration) {
         Taro.showToast({ title: '请输入时长', icon: 'none' })
@@ -165,7 +255,6 @@ export default function OtherPage() {
       const startTime = dateTimeToTimestamp(date, time)
 
       if (isEdit && editId) {
-        // 更新记录
         await updateRecord(editId, {
           category: 'other',
           subCategory: subType,
@@ -175,7 +264,6 @@ export default function OtherPage() {
         })
         Taro.showToast({ title: '更新成功！', icon: 'success' })
       } else {
-        // 创建新记录
         await createRecord({
           babyId: baby.id,
           category: 'other',
@@ -209,10 +297,31 @@ export default function OtherPage() {
     setShowCalendar(false)
   }
 
+  const temperatureStatus = getTemperatureStatus(temperature)
+  const recentRecordsForCurrentType: ApiRecord[] = []
+  const seenPrefillLabels = new Set<string>()
+
+  for (const record of recentRecords) {
+    if (record.subCategory !== subType) {
+      continue
+    }
+
+    const label = getPrefillLabel(record)
+    if (!label || seenPrefillLabels.has(label)) {
+      continue
+    }
+
+    seenPrefillLabels.add(label)
+    recentRecordsForCurrentType.push(record)
+
+    if (recentRecordsForCurrentType.length >= 5) {
+      break
+    }
+  }
+
   return (
     <View className='page-container other-page'>
       <View className='main-card'>
-        {/* Sub-menu */}
         <View className='section'>
           <Text className='field-label'>选择类型</Text>
           <View className='sub-menu-row'>
@@ -228,66 +337,64 @@ export default function OtherPage() {
           </View>
         </View>
 
-        {/* Time */}
         <View className='section section-inline'>
           <Text className='field-label'>时间</Text>
           <View className='time-row'>
-            <View className='picker-display' onClick={handleOpenCalendar}>{date}</View>
+            <View className='picker-display' onClick={handleOpenCalendar}>
+              {date}
+            </View>
             <Picker mode='time' value={time} onChange={(e) => setTime(e.detail.value)}>
               <View className='picker-display'>{time}</View>
             </Picker>
           </View>
         </View>
 
-        {/* Tonic */}
         {subType === 'tonic' && (
           <View className='section'>
             <Text className='field-label'>补剂种类</Text>
             <View className='options-row'>
-              {TONIC_TYPES.map((t) => (
+              {TONIC_TYPES.map((item) => (
                 <View
-                  key={t}
-                  className={`option-chip ${tonicType === t ? 'active' : ''}`}
-                  onClick={() => setTonicType(t)}
+                  key={item}
+                  className={`option-chip ${tonicType === item ? 'active' : ''}`}
+                  onClick={() => setTonicType(item)}
                 >
-                  <Text>{t}</Text>
+                  <Text>{item}</Text>
                 </View>
               ))}
             </View>
           </View>
         )}
 
-        {/* Gear */}
         {subType === 'gear' && (
           <View className='section'>
             <Text className='field-label'>类型</Text>
             <View className='options-row'>
-              {GEAR_TYPES.map((t) => (
+              {GEAR_TYPES.map((item) => (
                 <View
-                  key={t}
-                  className={`option-chip ${gearType === t ? 'active' : ''}`}
-                  onClick={() => setGearType(t)}
+                  key={item}
+                  className={`option-chip ${gearType === item ? 'active' : ''}`}
+                  onClick={() => setGearType(item)}
                 >
-                  <Text>{t}</Text>
+                  <Text>{item}</Text>
                 </View>
               ))}
             </View>
           </View>
         )}
 
-        {/* Growth */}
         {subType === 'growth' && (
           <>
             <View className='section'>
               <Text className='field-label'>类型</Text>
               <View className='options-row'>
-                {GROWTH_TYPES.map((t) => (
+                {GROWTH_TYPES.map((item) => (
                   <View
-                    key={t}
-                    className={`option-chip ${growthType === t ? 'active' : ''}`}
-                    onClick={() => setGrowthType(t)}
+                    key={item}
+                    className={`option-chip ${growthType === item ? 'active' : ''}`}
+                    onClick={() => setGrowthType(item)}
                   >
-                    <Text>{t}</Text>
+                    <Text>{item}</Text>
                   </View>
                 ))}
               </View>
@@ -308,10 +415,64 @@ export default function OtherPage() {
           </>
         )}
 
-        {/* Duration */}
+        {subType === 'medicine' && (
+          <>
+            <View className='section'>
+              <Text className='field-label'>药品名称</Text>
+              <Input
+                className='text-input'
+                type='text'
+                placeholder='请输入药品名称'
+                value={medicineName}
+                onInput={(e) => setMedicineName(e.detail.value)}
+              />
+            </View>
+            <View className='section'>
+              <Text className='field-label'>药量</Text>
+              <Input
+                className='text-input'
+                type='text'
+                placeholder='例如 5ml / 半包'
+                value={medicineAmount}
+                onInput={(e) => setMedicineAmount(e.detail.value)}
+              />
+            </View>
+          </>
+        )}
+
+        {subType === 'temperature' && (
+          <>
+            <View className='section'>
+              <Text className='field-label'>体温</Text>
+              <View className='number-input-row'>
+                <Input
+                  className='duration-input'
+                  type='digit'
+                  placeholder='请输入体温'
+                  value={temperature}
+                  onInput={(e) => setTemperature(e.detail.value)}
+                />
+                <Text className='unit-text'>℃</Text>
+              </View>
+            </View>
+            <View className='section section-vertical'>
+              <View className={`temperature-card ${temperatureStatus?.level || 'normal'}`}>
+                <Text className='temperature-title'>
+                  {temperatureStatus ? `当前判断：${temperatureStatus.label}` : '体温提示'}
+                </Text>
+                <Text className='temperature-message'>
+                  {temperatureStatus
+                    ? temperatureStatus.message
+                    : '输入体温后，这里会显示对应的体温提示。'}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+
         {(subType === 'outdoor' || subType === 'cry') && (
           <View className='section'>
-            <Text className='field-label'>{subType === 'outdoor' ? '时长' : '时长'}</Text>
+            <Text className='field-label'>时长</Text>
             <View className='number-input-row'>
               <Input
                 className='duration-input'
@@ -325,14 +486,13 @@ export default function OtherPage() {
           </View>
         )}
 
-        {/* Prefill - 移到最下面，编辑时不显示 */}
-        {!isEdit && recentRecords.length > 0 && (
+        {!isEdit && recentRecordsForCurrentType.length > 0 && (
           <View className='section section-vertical'>
             <Text className='field-label'>最近的记录</Text>
             <View className='prefill-row'>
-              {recentRecords.map(r => (
-                <View key={r.id} className='prefill-chip' onClick={() => applyPrefill(r)}>
-                  <Text>{formatRecordSummary(r)}</Text>
+              {recentRecordsForCurrentType.map((record) => (
+                <View key={record.id} className='prefill-chip' onClick={() => applyPrefill(record)}>
+                  <Text>{getPrefillLabel(record)}</Text>
                 </View>
               ))}
             </View>
