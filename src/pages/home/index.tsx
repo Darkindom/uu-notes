@@ -123,12 +123,6 @@ export default function HomePage() {
           <Text className='baby-title'>{babyName ? `${babyName} 的日常` : '加载中'}</Text>
         </View>
 
-        <View className='voice-record-btn' onClick={() => Taro.navigateTo({ url: '/pages/voice-record/index' })}>
-          <View className='voice-icon'>🎤</View>
-          <Text className='voice-text'>语音记录</Text>
-          <Text className='voice-hint'>点击说出你想记录的内容</Text>
-        </View>
-
         <View className='grid'>
           {MENU_ITEMS.map((item) => (
             <View
@@ -143,6 +137,11 @@ export default function HomePage() {
               </Text>
             </View>
           ))}
+        </View>
+
+        <View className='voice-record-btn' onClick={() => Taro.navigateTo({ url: '/pages/voice-record/index' })}>
+          <Text className='voice-icon'>🎤</Text>
+          <Text className='voice-text'>语音记录</Text>
         </View>
 
         {/* 提示区域 */}
