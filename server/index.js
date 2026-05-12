@@ -16,7 +16,7 @@ const app = express()
 const PORT = process.env.PORT || 1717
 
 // 初始化缓存：stdTTL 为默认过期时间（秒），checkperiod 为检查过期的周期
-const cache = new NodeCache({ 
+const cache = new NodeCache({
   stdTTL: 300,        // 5分钟默认过期
   checkperiod: 60,    // 每60秒检查一次过期
   useClones: false    // 不克隆对象，提高性能
@@ -31,13 +31,13 @@ if (!fs.existsSync(logsDir)) {
 // 日志工具函数
 function log(level, message, data = null) {
   const timestamp = new Date().toISOString()
-  const logMessage = data 
+  const logMessage = data
     ? `[${timestamp}] [${level}] ${message} ${JSON.stringify(data)}`
     : `[${timestamp}] [${level}] ${message}`
-  
+
   // 输出到控制台
   console.log(logMessage)
-  
+
   // 写入日志文件
   const logFile = path.join(logsDir, `${new Date().toISOString().split('T')[0]}.log`)
   fs.appendFileSync(logFile, logMessage + '\n')
@@ -64,7 +64,7 @@ function backupDatabase() {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]
     const backupPath = path.join(backupDir, `backup-${timestamp}.db`)
-    
+
     // 如果今天已经备份过，跳过
     if (fs.existsSync(backupPath)) {
       log('INFO', '今天已备份，跳过')
@@ -184,6 +184,17 @@ function ensureSchema() {
     log('WARN', 'users 表迁移失败（可能已存在）', { error: error.message })
   }
 
+  // 为 babies 表添加 llm_daily_limit 字段（-1 表示无限，NULL 表示使用全局默认 50）
+  try {
+    const babyCols = db.prepare("PRAGMA table_info(babies)").all().map(c => c.name)
+    if (!babyCols.includes('llm_daily_limit')) {
+      db.exec("ALTER TABLE babies ADD COLUMN llm_daily_limit INTEGER DEFAULT NULL")
+      log('MIGRATE', 'babies 表已添加 llm_daily_limit 字段')
+    }
+  } catch (error) {
+    log('WARN', 'babies 表迁移失败（可能已存在）', { error: error.message })
+  }
+
   // 创建 LLM 调用记录表
   db.exec(`
     CREATE TABLE IF NOT EXISTS llm_usage (
@@ -212,7 +223,7 @@ function clearRecordsCacheForBaby(babyId) {
   const cleared = []
   keys.forEach(key => {
     // 同时匹配数字和字符串格式的 babyId
-    if (key.startsWith('records:') && 
+    if (key.startsWith('records:') &&
         (key.includes(`"babyId":${babyId}`) || key.includes(`"babyId":"${babyId}"`))) {
       cache.del(key)
       cleared.push(key)
@@ -233,7 +244,7 @@ app.use(express.json())
 // 请求日志中间件
 app.use((req, res, next) => {
   const startTime = Date.now()
-  
+
   // 记录响应
   const originalSend = res.send
   res.send = function(data) {
@@ -244,7 +255,7 @@ app.use((req, res, next) => {
     })
     return originalSend.call(this, data)
   }
-  
+
   next()
 })
 
@@ -279,9 +290,9 @@ const verifyToken = (req, res, next) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { code } = req.body
-    
+
     let openId
-    
+
     // 开发环境：使用环境变量中的测试 openId
     if (process.env.NODE_ENV === 'development' && process.env.DEV_OPENID) {
       console.log('🔧 开发模式：使用测试 openId')
@@ -314,7 +325,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // 查找或创建用户
     let user = db.prepare('SELECT * FROM users WHERE openId = ?').get(openId)
-    
+
     console.log('查询到的用户:', user)
 
     if (!user) {
@@ -340,7 +351,7 @@ app.post('/api/auth/login', async (req, res) => {
     const token = jwt.sign({ userId: user.id, openId: user.openId }, process.env.JWT_SECRET, {
       expiresIn: '30d',
     })
-    
+
     const responseData = {
       success: true,
       data: {
@@ -351,7 +362,7 @@ app.post('/api/auth/login', async (req, res) => {
         },
       },
     }
-    
+
     console.log('返回的用户数据:', responseData.data.user)
 
     res.json(responseData)
@@ -439,12 +450,12 @@ app.get('/api/babies', verifyToken, (req, res) => {
     // 为每个宝宝获取成员详细信息
     const babiesWithMembers = babies.map((b) => {
       const memberIds = b.memberIds ? JSON.parse(b.memberIds) : []
-      
+
       // 获取成员详细信息
       const members = memberIds.map((userId) => {
         const userInfo = db.prepare('SELECT id, nickname FROM users WHERE id = ?').get(userId)
         const memberRelation = db.prepare('SELECT role FROM baby_members WHERE babyId = ? AND userId = ?').get(b.id, userId)
-        
+
         return {
           userId,
           nickname: userInfo?.nickname || '未命名',
@@ -646,19 +657,19 @@ app.delete('/api/babies/:babyId/members/:userId', verifyToken, (req, res) => {
     if (memberUserId === baby.creatorId) {
       // 找到第二个成员（不是创建者的第一个成员）
       const otherMembers = memberIds.filter(id => id !== memberUserId)
-      
+
       if (otherMembers.length === 0) {
         // 如果没有其他成员了，不允许删除自己（创建者）
         return res.status(400).json({ error: '创建者是最后一个成员，无法删除。请先添加其他成员或删除整个宝宝。' })
       }
-      
+
       // 将第一个其他成员设置为新的创建者
       newCreatorId = otherMembers[0]
-      
-      log('INFO', '创建者删除自己，提升新创建者', { 
-        babyId, 
-        oldCreatorId: memberUserId, 
-        newCreatorId 
+
+      log('INFO', '创建者删除自己，提升新创建者', {
+        babyId,
+        oldCreatorId: memberUserId,
+        newCreatorId
       })
     }
 
@@ -683,8 +694,8 @@ app.delete('/api/babies/:babyId/members/:userId', verifyToken, (req, res) => {
     if (memberUser) {
       const userBabyIds = memberUser.babyIds ? JSON.parse(memberUser.babyIds) : []
       const newUserBabyIds = userBabyIds.filter(id => id !== babyId)
-      const newCurrentBabyId = memberUser.currentBabyId === babyId 
-        ? (newUserBabyIds[0] || null) 
+      const newCurrentBabyId = memberUser.currentBabyId === babyId
+        ? (newUserBabyIds[0] || null)
         : memberUser.currentBabyId
 
       db.prepare(
@@ -696,7 +707,7 @@ app.delete('/api/babies/:babyId/members/:userId', verifyToken, (req, res) => {
       ).run(JSON.stringify(newUserBabyIds), newCurrentBabyId, now, memberUserId)
     }
 
-    res.json({ 
+    res.json({
       success: true,
       data: {
         newCreatorId: newCreatorId !== baby.creatorId ? newCreatorId : undefined
@@ -708,23 +719,23 @@ app.delete('/api/babies/:babyId/members/:userId', verifyToken, (req, res) => {
     const memberCacheKey = generateCacheKey('babies', { userId: memberUserId })
     cache.del(creatorCacheKey)
     cache.del(memberCacheKey)
-    
+
     // 如果提升了新创建者，也清除新创建者的缓存
     if (newCreatorId !== baby.creatorId) {
       const newCreatorCacheKey = generateCacheKey('babies', { userId: newCreatorId })
       cache.del(newCreatorCacheKey)
     }
 
-    log('INFO', '删除宝宝成员成功', { 
-      babyId, 
-      deletedUserId: memberUserId, 
-      newCreatorId: newCreatorId !== baby.creatorId ? newCreatorId : undefined 
+    log('INFO', '删除宝宝成员成功', {
+      babyId,
+      deletedUserId: memberUserId,
+      newCreatorId: newCreatorId !== baby.creatorId ? newCreatorId : undefined
     })
   } catch (error) {
-    log('ERROR', '删除宝宝成员失败', { 
-      error: error.message, 
-      babyId: req.params.babyId, 
-      userId: req.params.userId 
+    log('ERROR', '删除宝宝成员失败', {
+      error: error.message,
+      babyId: req.params.babyId,
+      userId: req.params.userId
     })
     res.status(500).json({ error: '删除宝宝成员失败' })
   }
@@ -781,7 +792,7 @@ app.post('/api/babies/:babyId/join', verifyToken, (req, res) => {
     `
     ).run(JSON.stringify(userBabyIds), user.currentBabyId || babyId, now, req.userId)
 
-    res.json({ 
+    res.json({
       success: true,
       data: {
         babyId,
@@ -793,16 +804,16 @@ app.post('/api/babies/:babyId/join', verifyToken, (req, res) => {
     const userCacheKey = generateCacheKey('babies', { userId: req.userId })
     cache.del(userCacheKey)
 
-    log('INFO', '用户加入宝宝成功', { 
-      babyId, 
-      userId: req.userId, 
-      role: role || '家长' 
+    log('INFO', '用户加入宝宝成功', {
+      babyId,
+      userId: req.userId,
+      role: role || '家长'
     })
   } catch (error) {
-    log('ERROR', '加入宝宝失败', { 
-      error: error.message, 
-      babyId: req.params.babyId, 
-      userId: req.userId 
+    log('ERROR', '加入宝宝失败', {
+      error: error.message,
+      babyId: req.params.babyId,
+      userId: req.userId
     })
     res.status(500).json({ error: '加入宝宝失败' })
   }
@@ -918,12 +929,12 @@ app.get('/api/records', verifyToken, (req, res) => {
     // 获取总数
     let countQuery = 'SELECT COUNT(*) as total FROM records r WHERE 1=1'
     const countParams = []
-    
+
     if (normalizedParams.babyId) {
       countQuery += ' AND r.babyId = ?'
       countParams.push(normalizedParams.babyId)
     }
-    
+
     if (category) {
       countQuery += ' AND r.category = ?'
       countParams.push(category)
@@ -939,7 +950,7 @@ app.get('/api/records', verifyToken, (req, res) => {
       countQuery += ' AND r.startTime <= ?'
       countParams.push(normalizedParams.endDate)
     }
-    
+
     const { total } = db.prepare(countQuery).get(...countParams)
 
     const responseData = {
@@ -1097,11 +1108,14 @@ app.get('/health', (req, res) => {
 // 检查 LLM 调用次数限制（用户维度 + 宝宝维度）
 function checkLLMRateLimit(userId, babyId) {
   const today = new Date().toISOString().split('T')[0]
-  const BABY_DAILY_LIMIT = 50
 
-  // 获取用户日限额
+  // 获取用户日限额（-1 表示无限）
   const user = db.prepare('SELECT llm_daily_limit FROM users WHERE id = ?').get(userId)
   const userLimit = user ? user.llm_daily_limit : 20
+
+  // 获取宝宝日限额（-1 表示无限，NULL 表示默认 50）
+  const baby = db.prepare('SELECT llm_daily_limit FROM babies WHERE id = ?').get(babyId)
+  const babyLimit = baby?.llm_daily_limit != null ? baby.llm_daily_limit : 50
 
   // 查询今日用户总调用次数
   const userUsage = db.prepare(
@@ -1117,8 +1131,8 @@ function checkLLMRateLimit(userId, babyId) {
     return { allowed: false, reason: `今日调用次数已达上限 (${userLimit}次)，联系作者可提高限额哦～` }
   }
 
-  if (babyUsage.total >= BABY_DAILY_LIMIT) {
-    return { allowed: false, reason: `今日该宝宝调用次数已达上限 (${BABY_DAILY_LIMIT}次)，联系作者可提高限额哦～` }
+  if (babyLimit !== -1 && babyUsage.total >= babyLimit) {
+    return { allowed: false, reason: `今日该宝宝调用次数已达上限 (${babyLimit}次)，联系作者可提高限额哦～` }
   }
 
   return { allowed: true }
@@ -1343,10 +1357,10 @@ app.post('/api/admin/cache/clear', verifyToken, (req, res) => {
     const keys = cache.keys()
     cache.flushAll()
     log('INFO', '手动清除所有缓存', { clearedCount: keys.length })
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `已清除 ${keys.length} 个缓存项`,
-      keys 
+      keys
     })
   } catch (error) {
     log('ERROR', '清除缓存失败', { error: error.message })
@@ -1359,8 +1373,8 @@ app.get('/api/admin/cache/stats', verifyToken, (req, res) => {
   try {
     const keys = cache.keys()
     const stats = cache.getStats()
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: {
         keys,
         count: keys.length,

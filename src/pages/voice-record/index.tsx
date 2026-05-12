@@ -159,33 +159,6 @@ export default function VoiceRecordPage() {
       </View>
 
       <View className='recording-section'>
-        {/* 录音按钮 - touch 事件绑在父层避免切换时丢失 */}
-        <View
-          className='record-area'
-          onTouchStart={() => { if (!isSubmitting && !isRecording) startRecording() }}
-          onTouchEnd={() => { if (isRecording) stopRecording() }}
-          onTouchCancel={() => { if (isRecording) stopRecording() }}
-        >
-          <View className={`record-circle${isRecording ? ' recording' : ''}`}>
-            {!isRecording ? (
-              <>
-                <View className='record-icon'>🎤</View>
-                <Text className='record-text'>按住录音</Text>
-              </>
-            ) : (
-              <>
-                <View className='recording-animation'>
-                  <View className='wave wave-1'></View>
-                  <View className='wave wave-2'></View>
-                  <View className='wave wave-3'></View>
-                  <View className='mic-icon'>🎤</View>
-                </View>
-                <Text className='recording-text'>松手结束</Text>
-              </>
-            )}
-          </View>
-        </View>
-
         {/* 文本框 */}
         <View className='text-section'>
           <Textarea
@@ -234,6 +207,28 @@ export default function VoiceRecordPage() {
             </View>
           </View>
         )}
+      </View>
+
+      {/* 底部录音按钮 */}
+      <View
+        className='record-footer'
+        onTouchStart={() => { if (!isSubmitting && !isRecording) startRecording() }}
+        onTouchEnd={() => { if (isRecording) stopRecording() }}
+        onTouchCancel={() => { if (isRecording) stopRecording() }}
+      >
+        <View className={`record-bar${isRecording ? ' recording' : ''}`}>
+          {!isRecording ? (
+            <>
+              <View className='record-icon'>🎤</View>
+              <Text className='record-text'>按住录音</Text>
+            </>
+          ) : (
+            <>
+              <View className='recording-dot'></View>
+              <Text className='recording-text'>松手结束</Text>
+            </>
+          )}
+        </View>
       </View>
     </View>
   )
