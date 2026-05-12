@@ -51,14 +51,23 @@
     }
 
     .action-buttons {
+      display: flex;
+      gap: 20px;
+
       .btn {
-        width: 100%;
+        flex: 1;
         height: 88px;
         border-radius: 44px;
         font-size: 32px;
         font-weight: bold;
         line-height: 88px;
         padding: 0;
+
+        &.btn-secondary {
+          background: white;
+          color: #FF6B35;
+          border: 3px solid #FF6B35;
+        }
 
         &.btn-primary {
           background: linear-gradient(135deg, #FF6B35 0%, #FF8C5A 100%);

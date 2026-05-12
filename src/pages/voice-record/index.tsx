@@ -149,7 +149,7 @@ export default function VoiceRecordPage() {
     setIsSubmitting(false)
   }
 
-  const reset = () => { setResults(null); setEditedText(''); setResults(null) }
+  const clearText = () => { setEditedText(''); setResults(null) }
 
   return (
     <View className='voice-record-page'>
@@ -175,6 +175,9 @@ export default function VoiceRecordPage() {
         {/* 分析按钮 / 确认列表 */}
         {!results ? (
           <View className='action-buttons'>
+            {editedText.trim() && (
+              <Button className='btn btn-secondary' onClick={clearText}>清空</Button>
+            )}
             <Button className='btn btn-primary' onClick={handleAnalyze} loading={isSubmitting} disabled={isSubmitting}>
               提交分析
             </Button>
@@ -202,7 +205,7 @@ export default function VoiceRecordPage() {
               )
             })}
             <View className='review-actions'>
-              <Button className='btn btn-secondary' onClick={reset}>重新分析</Button>
+              <Button className='btn btn-secondary' onClick={handleAnalyze}>重新分析</Button>
               <Button className='btn btn-primary' onClick={handleConfirm} loading={isSubmitting}>确认提交</Button>
             </View>
           </View>
