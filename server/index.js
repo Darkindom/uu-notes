@@ -102,9 +102,12 @@ setInterval(() => {
 // 启动时立即备份一次
 backupDatabase()
 
-// 初始化数据库
-const db = new Database(process.env.DB_PATH || './data/uu-notes.db')
-log('INFO', '数据库初始化完成')
+// 初始化数据库（开发环境优先使用 LOCAL_DB_PATH）
+const dbPath = (process.env.NODE_ENV === 'development' && process.env.LOCAL_DB_PATH)
+  ? process.env.LOCAL_DB_PATH
+  : (process.env.DB_PATH || './data/uu-notes.db')
+const db = new Database(dbPath)
+log('INFO', `数据库初始化完成: ${dbPath}`)
 
 // 创建表
 db.exec(`
@@ -1150,17 +1153,21 @@ function callDeepSeekAPI(text) {
 - shit: 拉/换尿布（关键词：拉、大便、尿、换尿布、尿片、尿不湿）
 - other: 其他与宝宝相关但不属于以上类别的内容
 
-## 子类别
-food: breast(母乳) / formula(奶粉) / solid(辅食)
+## 子类别（必须使用以下精确值）
+food: breast_milk(母乳) / milk(奶粉) / babycook(辅食) / water(水)
+sleep: subCategory 固定为 sleep
 shit: big(大便) / small(换尿布/小便)
 
-## value
-提取文本中的数字信息（奶量等），只提取数字不带单位
+## value 规则
+- food 类型：提取奶量/食量的数字，单位默认为 ml
+- **sleep 类型：必须转换为分钟**，如"睡了5小时" → value="300"，"睡了30分钟" → value="30"
+- shit 类型：通常不填 value
 
 ## 输出格式
 只返回 JSON 数组，不要额外解释：
 [
-  { "category": "food", "subCategory": "formula", "value": "150", "note": "喝了150毫升奶" },
+  { "category": "food", "subCategory": "milk", "value": "150", "note": "喝了150毫升奶" },
+  { "category": "sleep", "subCategory": "sleep", "value": "300", "note": "睡了5小时" },
   { "category": "shit", "subCategory": "small", "note": "换了尿布" }
 ]`,
         },
@@ -1210,24 +1217,55 @@ shit: big(大便) / small(换尿布/小便)
   })
 }
 
+// 子类别别名映射表：LLM 返回的各种可能值 → 系统实际值
+const SUBCATEGORY_ALIASES = {
+  // food
+  breast: 'breast_milk',
+  breast_milk: 'breast_milk',
+  formula: 'milk',
+  milk: 'milk',
+  solid: 'babycook',
+  babycook: 'babycook',
+  water: 'water',
+  // sleep
+  sleep: 'sleep',
+  // shit
+  big: 'big',
+  small: 'small',
+}
+
 // 校验并清理 LLM 返回的单条记录
 function validateRecordItem(item) {
   const validCategories = ['food', 'sleep', 'shit', 'other']
   const category = validCategories.includes(item.category) ? item.category : 'other'
   const result = { category }
 
+  // 子类别：先通过别名表转换，再校验
   if (item.subCategory) {
-    const validSubs = {
-      food: ['breast', 'formula', 'solid'],
-      shit: ['big', 'small'],
-    }
-    if (validSubs[category] && validSubs[category].includes(item.subCategory)) {
-      result.subCategory = item.subCategory
+    const mapped = SUBCATEGORY_ALIASES[item.subCategory]
+    if (mapped) {
+      result.subCategory = mapped
     }
   }
 
+  // 睡眠没有子类别时补上
+  if (category === 'sleep' && !result.subCategory) {
+    result.subCategory = 'sleep'
+  }
+
+  // value 处理：提取数字并做单位转换
   if (item.value && /^\d+/.test(String(item.value))) {
-    result.value = String(item.value).match(/^\d+/)[0]
+    let v = parseInt(String(item.value).match(/^\d+/)[0])
+
+    // 睡眠单位转换：如果文字里提到"小时/h/小时(s)"且数值 < 24，转换为分钟
+    if (category === 'sleep' && v > 0) {
+      const text = (item.note || '').toLowerCase()
+      if (/小时|个小时|个钟|hour|h\b/.test(text) && v < 24) {
+        v = v * 60
+      }
+    }
+
+    result.value = String(v)
   }
 
   result.note = item.note || ''
