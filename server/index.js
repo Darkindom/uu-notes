@@ -5,7 +5,12 @@ const Database = require('better-sqlite3')
 const jwt = require('jsonwebtoken')
 const fs = require('fs')
 const path = require('path')
+const https = require('https')
 const NodeCache = require('node-cache')
+
+// DeepSeek API 配置
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || ''
+const DEEPSEEK_API_BASE = process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com'
 
 const app = express()
 const PORT = process.env.PORT || 1717
@@ -163,6 +168,36 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_baby_members_userId ON baby_members(userId);
 `)
 
+// 自动迁移数据库 schema
+function ensureSchema() {
+  // 为 users 表添加 llm_daily_limit 字段（-1 表示无限）
+  try {
+    const userCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name)
+    if (!userCols.includes('llm_daily_limit')) {
+      db.exec("ALTER TABLE users ADD COLUMN llm_daily_limit INTEGER DEFAULT 20")
+      log('MIGRATE', 'users 表已添加 llm_daily_limit 字段')
+    }
+  } catch (error) {
+    log('WARN', 'users 表迁移失败（可能已存在）', { error: error.message })
+  }
+
+  // 创建 LLM 调用记录表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS llm_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      babyId INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      count INTEGER DEFAULT 1,
+      UNIQUE(userId, babyId, date)
+    );
+    CREATE INDEX IF NOT EXISTS idx_llm_usage_user_date ON llm_usage(userId, date);
+    CREATE INDEX IF NOT EXISTS idx_llm_usage_baby_date ON llm_usage(babyId, date);
+  `)
+  log('MIGRATE', '数据库 schema 迁移完成')
+}
+ensureSchema()
+
 // 缓存辅助函数
 function generateCacheKey(prefix, params) {
   return `${prefix}:${JSON.stringify(params)}`
@@ -213,6 +248,13 @@ app.use((req, res, next) => {
 // JWT 验证中间件
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '')
+
+  // 开发模式：无 token 时自动使用测试用户
+  if (process.env.NODE_ENV === 'development' && !token) {
+    req.userId = 1
+    req.openId = process.env.DEV_OPENID || 'test'
+    return next()
+  }
 
   if (!token) {
     return res.status(401).json({ error: '未提供认证令牌' })
@@ -1046,6 +1088,216 @@ app.get('/health', (req, res) => {
 })
 
 // ============ 缓存管理接口（调试用）============
+
+// ============ 语音识别 AI 分析 ============
+
+// 检查 LLM 调用次数限制（用户维度 + 宝宝维度）
+function checkLLMRateLimit(userId, babyId) {
+  const today = new Date().toISOString().split('T')[0]
+  const BABY_DAILY_LIMIT = 50
+
+  // 获取用户日限额
+  const user = db.prepare('SELECT llm_daily_limit FROM users WHERE id = ?').get(userId)
+  const userLimit = user ? user.llm_daily_limit : 20
+
+  // 查询今日用户总调用次数
+  const userUsage = db.prepare(
+    'SELECT COALESCE(SUM(count), 0) as total FROM llm_usage WHERE userId = ? AND date = ?'
+  ).get(userId, today)
+
+  // 查询今日该宝宝调用次数
+  const babyUsage = db.prepare(
+    'SELECT COALESCE(SUM(count), 0) as total FROM llm_usage WHERE babyId = ? AND date = ?'
+  ).get(babyId, today)
+
+  if (userLimit !== -1 && userUsage.total >= userLimit) {
+    return { allowed: false, reason: `今日调用次数已达上限 (${userLimit}次)，联系作者可提高限额哦～` }
+  }
+
+  if (babyUsage.total >= BABY_DAILY_LIMIT) {
+    return { allowed: false, reason: `今日该宝宝调用次数已达上限 (${BABY_DAILY_LIMIT}次)，联系作者可提高限额哦～` }
+  }
+
+  return { allowed: true }
+}
+
+// 记录 LLM 调用
+function recordLLMUsage(userId, babyId) {
+  const today = new Date().toISOString().split('T')[0]
+  db.prepare(`
+    INSERT INTO llm_usage (userId, babyId, date, count)
+    VALUES (?, ?, ?, 1)
+    ON CONFLICT(userId, babyId, date) DO UPDATE SET count = count + 1
+  `).run(userId, babyId, today)
+}
+
+// 调用 DeepSeek API 分析语音文本
+function callDeepSeekAPI(text) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content: `你是一个宝宝日常记录的智能助手。你只处理与宝宝日常护理相关的内容（喂养、睡觉、排便等）。
+
+## 重要限制
+如果用户输入的内容与宝宝日常记录完全无关（比如聊天气、问编程问题、讲笑话等），请返回空数组：[]。不要对无关内容强行分类。
+
+## 分类规则
+- food: 吃/喂养（关键词：喝、吃、奶、母乳、奶粉、辅食、喂）
+- sleep: 睡觉（关键词：睡、觉、入睡、睡着）
+- shit: 拉/换尿布（关键词：拉、大便、尿、换尿布、尿片、尿不湿）
+- other: 其他与宝宝相关但不属于以上类别的内容
+
+## 子类别
+food: breast(母乳) / formula(奶粉) / solid(辅食)
+shit: big(大便) / small(换尿布/小便)
+
+## value
+提取文本中的数字信息（奶量等），只提取数字不带单位
+
+## 输出格式
+只返回 JSON 数组，不要额外解释：
+[
+  { "category": "food", "subCategory": "formula", "value": "150", "note": "喝了150毫升奶" },
+  { "category": "shit", "subCategory": "small", "note": "换了尿布" }
+]`,
+        },
+        { role: 'user', content: text },
+      ],
+      temperature: 0.1,
+      max_tokens: 1000,
+    })
+
+    const url = new URL('/v1/chat/completions', DEEPSEEK_API_BASE)
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+        },
+        timeout: 30000,
+      },
+      (res) => {
+        let data = ''
+        res.on('data', (chunk) => (data += chunk))
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.error) {
+              reject(new Error(parsed.error.message || 'DeepSeek API 错误'))
+              return
+            }
+            resolve(parsed.choices[0].message.content)
+          } catch (e) {
+            reject(new Error('DeepSeek 响应解析失败: ' + data.substring(0, 200)))
+          }
+        })
+      }
+    )
+
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('DeepSeek API 请求超时'))
+    })
+    req.on('error', (e) => reject(e))
+    req.write(body)
+    req.end()
+  })
+}
+
+// 校验并清理 LLM 返回的单条记录
+function validateRecordItem(item) {
+  const validCategories = ['food', 'sleep', 'shit', 'other']
+  const category = validCategories.includes(item.category) ? item.category : 'other'
+  const result = { category }
+
+  if (item.subCategory) {
+    const validSubs = {
+      food: ['breast', 'formula', 'solid'],
+      shit: ['big', 'small'],
+    }
+    if (validSubs[category] && validSubs[category].includes(item.subCategory)) {
+      result.subCategory = item.subCategory
+    }
+  }
+
+  if (item.value && /^\d+/.test(String(item.value))) {
+    result.value = String(item.value).match(/^\d+/)[0]
+  }
+
+  result.note = item.note || ''
+
+  return result
+}
+
+// POST /api/voice/analyze
+app.post('/api/voice/analyze', verifyToken, async (req, res) => {
+  const { text, babyId } = req.body
+
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: '文本内容不能为空' })
+  }
+  if (!babyId) {
+    return res.status(400).json({ error: '请指定宝宝' })
+  }
+
+  const trimmedText = text.trim()
+
+  // 限流检查
+  const rateCheck = checkLLMRateLimit(req.userId, babyId)
+  if (!rateCheck.allowed) {
+    log('RATE', 'LLM 限流', { userId: req.userId, babyId, reason: rateCheck.reason })
+    return res.status(429).json({ error: rateCheck.reason })
+  }
+
+  log('AI', '开始分析语音文本', { userId: req.userId, babyId, textLength: trimmedText.length })
+
+  try {
+    const aiResponse = await callDeepSeekAPI(trimmedText)
+    log('AI', 'DeepSeek 原始响应', { response: aiResponse })
+
+    // 解析 JSON
+    let parsed
+    const jsonMatch = aiResponse.match(/\[[\s\S]*\]/)
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[0])
+    } else {
+      // 尝试匹配单个对象
+      const objMatch = aiResponse.match(/\{[\s\S]*\}/)
+      if (objMatch) {
+        parsed = [JSON.parse(objMatch[0])]
+      } else {
+        throw new Error('无法解析 AI 响应')
+      }
+    }
+
+    // 确保是数组
+    const items = Array.isArray(parsed) ? parsed : [parsed]
+
+    // 校验每条记录
+    const validated = items.map(validateRecordItem).filter(item => item.note || item.category !== 'other')
+
+    // 过滤后为空，说明内容与宝宝无关，拒绝处理
+    if (validated.length === 0) {
+      return res.json({ success: false, error: '请描述与宝宝日常相关的内容，如喂奶、睡觉、换尿布等' })
+    }
+
+    // 记录 LLM 调用次数
+    recordLLMUsage(req.userId, babyId)
+
+    log('AI', '分析完成', { validated, count: validated.length })
+    res.json({ success: true, data: validated })
+  } catch (error) {
+    log('ERROR', 'AI 分析失败', { error: error.message, text: trimmedText })
+    // 兜底：返回 other 记录
+    res.json({ success: true, data: [{ category: 'other', note: trimmedText }] })
+  }
+})
 
 // 清除所有缓存
 app.post('/api/admin/cache/clear', verifyToken, (req, res) => {

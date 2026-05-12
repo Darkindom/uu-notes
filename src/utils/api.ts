@@ -518,5 +518,21 @@ export const getRecentRecordsByCategory = async (
 
 // ============ 语音识别相关 ============
 
-// 导出 AI Agent 相关类型和函数
-export { analyzeVoiceText, type VoiceAnalysisResult } from './aiAgent'
+export interface VoiceAnalysisResult {
+  category: string
+  subCategory?: string
+  value?: string
+  note?: string
+}
+
+/**
+ * 调用后端 AI 接口分析语音文本
+ */
+export const analyzeVoiceText = async (text: string, babyId: number): Promise<VoiceAnalysisResult[]> => {
+  const data = await request<VoiceAnalysisResult[]>({
+    url: '/voice/analyze',
+    method: 'POST',
+    data: { text, babyId },
+  })
+  return data
+}
