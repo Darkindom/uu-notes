@@ -1,5 +1,5 @@
 import { View, Text } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import { getCurrentBaby, checkLogin, getRecentRecordsByCategory } from '../../utils/api'
 import { getIndexCache, setIndexCache, clearIndexCache } from '../../utils/cache'
@@ -19,8 +19,14 @@ export default function HomePage() {
     return cache?.name || ''
   })
   const [timeSinceFood, setTimeSinceFood] = useState<string>('')
-  const [timeSincePoop, setTimeSincePoop] = useState<string>('')
   const [timeSinceDiaper, setTimeSinceDiaper] = useState<string>('')
+  const [timeSincePoop, setTimeSincePoop] = useState<string>('')
+
+  // 仅分享小程序入口，不带宝宝邀请参数（邀请只在「宝宝」页）
+  useShareAppMessage(() => ({
+    title: 'UU宝宝日记',
+    path: '/pages/index/index',
+  }))
 
   // 计算时间差
   const calculateTimeDiff = (timestamp: number): string => {
@@ -36,9 +42,9 @@ export default function HomePage() {
     }
 
     const parts: string[] = []
-    if (days > 0) parts.push(`${days} 天`)
-    if (hours > 0) parts.push(`${hours} 时`)
-    if (minutes > 0) parts.push(`${minutes} 分`)
+    if (days > 0) parts.push(`${days}天`)
+    if (hours > 0) parts.push(`${hours}时`)
+    if (days === 0 && minutes > 0) parts.push(`${minutes}分`)
 
     return parts.length > 0 ? parts.join(' ') : '刚刚'
   }
@@ -54,24 +60,17 @@ export default function HomePage() {
         setTimeSinceFood('')
       }
 
-      // 获取最近的拉记录，区分大便和换尿片
-      const shitRecords = await getRecentRecordsByCategory('shit', 10)
-
-      // 找最近的大便记录 (subCategory === 'big')
-      const poopRecord = shitRecords.find((r) => r.subCategory === 'big')
-      if (poopRecord) {
-        setTimeSincePoop(calculateTimeDiff(poopRecord.startTime))
-      } else {
-        setTimeSincePoop('')
+      // 分别取最近一次换尿片、大便（subCategory: small / big）
+      const shitRecords = await getRecentRecordsByCategory('shit', 50)
+      let lastDiaper: (typeof shitRecords)[0] | undefined
+      let lastPoop: (typeof shitRecords)[0] | undefined
+      for (const r of shitRecords) {
+        if (r.subCategory === 'small' && !lastDiaper) lastDiaper = r
+        if (r.subCategory === 'big' && !lastPoop) lastPoop = r
+        if (lastDiaper && lastPoop) break
       }
-
-      // 找最近的换尿片记录 (subCategory === 'small')
-      const diaperRecord = shitRecords.find((r) => r.subCategory === 'small')
-      if (diaperRecord) {
-        setTimeSinceDiaper(calculateTimeDiff(diaperRecord.startTime))
-      } else {
-        setTimeSinceDiaper('')
-      }
+      setTimeSinceDiaper(lastDiaper ? calculateTimeDiff(lastDiaper.startTime) : '')
+      setTimeSincePoop(lastPoop ? calculateTimeDiff(lastPoop.startTime) : '')
     } catch (error) {
       console.error('获取记录失败:', error)
     }
@@ -152,7 +151,7 @@ export default function HomePage() {
             <View className='hint-item'>
               <View className='hint-label'>
                 <Text className='hint-label-light'>距上次</Text>
-                <Text className='hint-label-bold'>喂养</Text>
+                <Text className='hint-label-eat'>吃</Text>
               </View>
               <Text className='hint-time'>{timeSinceFood}</Text>
             </View>
@@ -161,7 +160,7 @@ export default function HomePage() {
             <View className='hint-item'>
               <View className='hint-label'>
                 <Text className='hint-label-light'>距上次</Text>
-                <Text className='hint-label-bold'>换尿布</Text>
+                <Text className='hint-label-diaper'>换尿片</Text>
               </View>
               <Text className='hint-time'>{timeSinceDiaper}</Text>
             </View>
@@ -170,7 +169,7 @@ export default function HomePage() {
             <View className='hint-item'>
               <View className='hint-label'>
                 <Text className='hint-label-light'>距上次</Text>
-                <Text className='hint-label-bold'>大便</Text>
+                <Text className='hint-label-poop'>大便</Text>
               </View>
               <Text className='hint-time'>{timeSincePoop}</Text>
             </View>

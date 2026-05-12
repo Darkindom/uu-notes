@@ -33,6 +33,8 @@ export const SUBCATEGORY_LABELS: { [key: string]: string } = {
   outdoor: '户外',
   cry: '哭闹',
   gear: '护具',
+  medicine: '药',
+  temperature: '体温',
 }
 
 export const CATEGORY_LABELS: { [key: string]: string } = {
@@ -63,8 +65,7 @@ export function formatRecordSummary(record: Record): string {
     return `喝水 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
   }
   if (sub === 'babycook') {
-    const food = extra.food_type ? `(${extra.food_type})` : ''
-    return `辅食${food} ${AMOUNT_LABELS[parseInt(val)] ?? val}`
+    return `辅食 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
   }
   if (sub === 'sleep') {
     const mins = parseInt(val)
@@ -99,6 +100,12 @@ export function formatRecordSummary(record: Record): string {
     const unit = growthType === '身高' ? 'cm' : 'kg'
     return `${growthType} ${val}${unit}`
   }
+  if (sub === 'medicine') {
+    return `药 ${val}${extra.medicine_amount ? ` ${extra.medicine_amount}` : ''}`.trim()
+  }
+  if (sub === 'temperature') {
+    return `体温 ${val}℃`
+  }
   return SUBCATEGORY_LABELS[sub] ?? sub
 }
 
@@ -130,4 +137,14 @@ export function timestampToDateTime(ts: number): { date: string; time: string } 
     date: `${year}-${month}-${day}`,
     time: `${hours}:${mins}`,
   }
+}
+
+export function getFoodTypeDetail(record: Record): string {
+  const sub = record.subCategory || ''
+  const extra = (record.extra as any) || {}
+  
+  if (sub === 'babycook' && extra.food_type) {
+    return extra.food_type
+  }
+  return ''
 }

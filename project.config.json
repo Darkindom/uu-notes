@@ -37,5 +37,6 @@
   },
   "editorSetting": {},
   "cloudfunctionRoot": "cloud/",
-  "cloudbaseRoot": "cloud/"
+  "cloudbaseRoot": "cloud/",
+  "libVersion": "3.14.2"
 }

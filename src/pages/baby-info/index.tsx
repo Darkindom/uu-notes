@@ -7,6 +7,7 @@ import {
   switchBaby,
   getCurrentUser,
   deleteBaby,
+  deleteBabyMember,
   getRecords,
   type Baby,
 } from '../../utils/api'
@@ -39,6 +40,12 @@ interface TodayStats {
   nightMilkCount: number // 夜奶次数
 }
 
+interface WeeklyFoodData {
+  dayName: string // 周一、周二...
+  foods: string[] // 辅食列表
+  hasData: boolean
+}
+
 export default function BabySelectorPage() {
   const [babies, setBabies] = useState<Baby[]>([])
   const [currentBabyId, setCurrentBabyId] = useState<number | undefined>(undefined)
@@ -52,6 +59,8 @@ export default function BabySelectorPage() {
   const [showCalendar, setShowCalendar] = useState(false)
   const [weeklyData, setWeeklyData] = useState<DayData[]>([])
   const [chartLoading, setChartLoading] = useState(false)
+  const [weeklyFoodData, setWeeklyFoodData] = useState<WeeklyFoodData[]>([])
+  const [foodDataLoading, setFoodDataLoading] = useState(false)
 
   useLoad(async () => {
     await loadBabies()
@@ -63,6 +72,7 @@ export default function BabySelectorPage() {
       Promise.all([
         loadTodayStats(currentBabyId, selectedDate),
         loadWeeklyData(currentBabyId),
+        loadWeeklyFoodData(currentBabyId),
       ]).catch((error) => {
         console.error('加载数据失败:', error)
       })
@@ -73,12 +83,12 @@ export default function BabySelectorPage() {
     if (!selectedBaby) {
       return {
         title: '宝宝成长记录',
-        path: '/pages/home/index',
+        path: '/pages/index/index',
       }
     }
     return {
       title: `邀请你加入「${selectedBaby.name}」的成长记录`,
-      path: `/pages/home/index?babyId=${selectedBaby.id}&inviteFrom=share`,
+      path: `/pages/index/index?babyId=${selectedBaby.id}&inviteFrom=share`,
     }
   })
 
@@ -96,6 +106,7 @@ export default function BabySelectorPage() {
         Promise.all([
           loadTodayStats(user.currentBabyId, selectedDate),
           loadWeeklyData(user.currentBabyId),
+          loadWeeklyFoodData(user.currentBabyId),
         ]).catch((error) => {
           console.error('加载数据失败:', error)
         })
@@ -521,6 +532,80 @@ export default function BabySelectorPage() {
     }
   }
 
+  async function loadWeeklyFoodData(babyId: number) {
+    try {
+      setFoodDataLoading(true)
+
+      const weekFoodData: WeeklyFoodData[] = []
+      const today = new Date()
+      
+      // 获取本周一的日期
+      const currentDay = today.getDay()
+      const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay
+      const monday = new Date(today)
+      monday.setDate(today.getDate() + diffToMonday)
+      monday.setHours(0, 0, 0, 0)
+
+      const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(monday)
+        date.setDate(monday.getDate() + i)
+        
+        // 只加载到今天为止
+        if (date > today) {
+          break
+        }
+        
+        const startOfDay = new Date(date)
+        startOfDay.setHours(0, 0, 0, 0)
+        const endOfDay = new Date(date)
+        endOfDay.setHours(23, 59, 59, 999)
+
+        try {
+          const response = await getRecords({
+            babyId,
+            limit: 1000,
+            offset: 0,
+            startDate: startOfDay.getTime(),
+            endDate: endOfDay.getTime(),
+          })
+
+          const foods: string[] = []
+          
+          response.records.forEach((record) => {
+            if (record.category === 'food' && record.subCategory === 'babycook') {
+              const foodType = record.extra?.food_type
+              if (foodType) {
+                foods.push(foodType)
+              }
+            }
+          })
+
+          weekFoodData.push({
+            dayName: dayNames[i],
+            foods,
+            hasData: foods.length > 0,
+          })
+        } catch (error) {
+          console.error(`获取 ${dayNames[i]} 辅食数据失败:`, error)
+          weekFoodData.push({
+            dayName: dayNames[i],
+            foods: [],
+            hasData: false,
+          })
+        }
+      }
+
+      setWeeklyFoodData(weekFoodData)
+    } catch (error) {
+      console.error('加载本周辅食数据失败:', error)
+      setWeeklyFoodData([])
+    } finally {
+      setFoodDataLoading(false)
+    }
+  }
+
   async function handleSwitch(babyId: number) {
     if (babyId === currentBabyId) {
       // 如果点击的是当前宝宝，不做任何操作
@@ -643,6 +728,60 @@ export default function BabySelectorPage() {
     e.stopPropagation()
     setSelectedBaby(baby)
     setShowMembersModal(true)
+  }
+
+  async function handleDeleteMember(member: any, e: any) {
+    e.stopPropagation()
+
+    if (!selectedBaby) return
+
+    // 检查权限：只有创建者可以删除成员
+    if (selectedBaby.creatorId !== currentUserId) {
+      Taro.showModal({
+        title: '提示',
+        content: '仅宝宝创建者有删除权限',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+
+    // 二次确认
+    const res = await Taro.showModal({
+      title: '确认删除',
+      content: `确定要删除成员"${member.nickname}"吗？`,
+      confirmText: '删除',
+      cancelText: '取消',
+      confirmColor: '#ff4d4f',
+    })
+
+    if (!res.confirm) return
+
+    try {
+      Taro.showLoading({ title: '删除中...' })
+      await deleteBabyMember(selectedBaby.id, member.userId)
+      Taro.hideLoading()
+      Taro.showToast({ title: '删除成功', icon: 'success' })
+      
+      // 刷新宝宝列表
+      await loadBabies()
+      
+      // 更新弹窗中的宝宝信息
+      const updatedBabies = await getBabies()
+      const updatedBaby = updatedBabies.find((b) => b.id === selectedBaby.id)
+      if (updatedBaby) {
+        setSelectedBaby(updatedBaby)
+      } else {
+        // 如果宝宝不存在了（可能被删除），关闭弹窗
+        setShowMembersModal(false)
+      }
+    } catch (error: any) {
+      Taro.hideLoading()
+      Taro.showToast({
+        title: error.message || '删除失败',
+        icon: 'none',
+      })
+    }
   }
 
   // 打开日历
@@ -905,6 +1044,32 @@ export default function BabySelectorPage() {
             </View>
           )}
 
+          {/* 本周辅食情况 */}
+          {currentBabyId && weeklyFoodData.some((day) => day.hasData) && (
+            <View className='weekly-food-section'>
+              <View className='weekly-food-header'>
+                <Text className='weekly-food-title'>本周辅食情况</Text>
+                {foodDataLoading && <LoadingSpinner size='small' color='#999' />}
+              </View>
+              <View className='weekly-food-content'>
+                {weeklyFoodData.map((dayData, index) => (
+                  <View key={index} className='food-day-item'>
+                    <View className='food-day-label'>
+                      <Text className='food-day-name'>{dayData.dayName}</Text>
+                    </View>
+                    <View className='food-day-content'>
+                      {dayData.hasData ? (
+                        <Text className='food-day-text'>{dayData.foods.join('、')}</Text>
+                      ) : (
+                        <Text className='food-day-empty'>—</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* 图表 */}
           {currentBabyId && (
             <View className='chart-section'>
@@ -944,6 +1109,18 @@ export default function BabySelectorPage() {
                       <Text className='member-name'>{member.nickname}</Text>
                       <Text className='member-role'>{member.role}</Text>
                     </View>
+                    <View
+                      className={`delete-member-btn ${
+                        selectedBaby.creatorId !== currentUserId ? 'disabled' : ''
+                      }`}
+                      onClick={(e) => {
+                        if (selectedBaby.creatorId === currentUserId) {
+                          handleDeleteMember(member, e)
+                        }
+                      }}
+                    >
+                      <Text className='delete-member-text'>删除</Text>
+                    </View>
                   </View>
                 ))
               ) : (
@@ -956,6 +1133,7 @@ export default function BabySelectorPage() {
               <Button className='invite-btn' openType='share'>
                 邀请成员
               </Button>
+              <Text className='permission-hint'>仅宝宝创建者有删除权限</Text>
             </View>
           </View>
         </View>

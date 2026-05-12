@@ -262,6 +262,35 @@
   scrollbar-width: none;
 }
 
+.other-subfilters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.subfilter-label {
+  font-size: 40px;
+  font-weight: 600;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.subcategory-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  scrollbar-width: none;
+}
+
 .filter-chip {
   padding: 16px 30px;
   border-radius: 28px;
@@ -282,6 +311,25 @@
 .filter-chip.active {
   background: #ff9500;
   color: #fff;
+  font-weight: 700;
+}
+
+.subfilter-chip {
+  padding: 12px 22px;
+  border-radius: 24px;
+  background: #f7f7f7;
+  border: 2px solid #ececec;
+  font-size: 34px;
+  color: #777;
+  font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.subfilter-chip.active {
+  background: #edfbf3;
+  border-color: #4caf7d;
+  color: #4caf7d;
   font-weight: 700;
 }
 
@@ -392,6 +440,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.record-detail-row {
+  display: flex;
+  align-items: center;
+  margin-top: -6px;
+}
+
+.record-detail {
+  font-size: 32px;
+  font-weight: 500;
+  color: #666;
+  line-height: 1.5;
+  word-break: break-all;
 }
 
 .record-sub-row {

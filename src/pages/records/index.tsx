@@ -1,9 +1,15 @@
 import { View, Text, ScrollView } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import dayjs from 'dayjs'
 import { getRecords, deleteRecord, getCurrentBaby, type Record as ApiRecord } from '../../utils/api'
-import { formatTimestamp, formatRecordSummary, CATEGORY_LABELS } from '../../utils/format'
+import {
+  formatTimestamp,
+  formatRecordSummary,
+  getFoodTypeDetail,
+  CATEGORY_LABELS,
+  SUBCATEGORY_LABELS,
+} from '../../utils/format'
 import { clearCachedRecords } from '../../utils/cache'
 import Calendar from '../../components/Calendar'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -21,6 +27,9 @@ interface TodayStats {
   tonic: number // 补剂次数
   cry: number // 哭闹次数
   gearHours: number // 护具佩戴小时数
+  growth: number // 成长次数
+  medicine: number // 用药次数
+  temperature: number // 体温次数
   nightMilkCount: number // 夜奶次数
 }
 
@@ -37,6 +46,17 @@ const CATEGORY_FILTERS = [
   { label: '睡', value: 'sleep' },
   { label: '拉', value: 'shit' },
   { label: '其他', value: 'other' },
+]
+
+const OTHER_SUBCATEGORY_FILTERS = [
+  { label: '全部', value: '' },
+  { label: SUBCATEGORY_LABELS.tonic, value: 'tonic' },
+  { label: SUBCATEGORY_LABELS.medicine, value: 'medicine' },
+  { label: SUBCATEGORY_LABELS.temperature, value: 'temperature' },
+  { label: '成长', value: 'growth' },
+  { label: SUBCATEGORY_LABELS.outdoor, value: 'outdoor' },
+  { label: SUBCATEGORY_LABELS.cry, value: 'cry' },
+  { label: SUBCATEGORY_LABELS.gear, value: 'gear' },
 ]
 
 function groupByDate(records: ApiRecord[]) {
@@ -61,6 +81,7 @@ export default function RecordsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false) // 后台刷新状态
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [otherSubFilter, setOtherSubFilter] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
@@ -69,6 +90,12 @@ export default function RecordsPage() {
   })
   const [showCalendar, setShowCalendar] = useState(false)
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null)
+
+  // 仅分享小程序入口，不带宝宝邀请参数（邀请只在「宝宝」页）
+  useShareAppMessage(() => ({
+    title: 'UU宝宝日记',
+    path: '/pages/index/index',
+  }))
 
   // 初始加载
   useDidShow(async () => {
@@ -95,6 +122,9 @@ export default function RecordsPage() {
       tonic: 0,
       cry: 0,
       gearHours: 0,
+      growth: 0,
+      medicine: 0,
+      temperature: 0,
       nightMilkCount: 0,
     }
 
@@ -141,6 +171,12 @@ export default function RecordsPage() {
             stats.tonic++
           } else if (record.subCategory === 'cry') {
             stats.cry++
+          } else if (record.subCategory === 'growth') {
+            stats.growth++
+          } else if (record.subCategory === 'medicine') {
+            stats.medicine++
+          } else if (record.subCategory === 'temperature') {
+            stats.temperature++
           } else if (record.subCategory === 'gear') {
             const gearType = record.extra?.gear_type
             if (gearType === '带上') {
@@ -379,10 +415,39 @@ export default function RecordsPage() {
     setShowCalendar(false)
   }
 
+  function getOtherFilterStatText(subFilter: string): string {
+    switch (subFilter) {
+      case 'tonic':
+        return `补剂 ${todayStats?.tonic || 0} 次`
+      case 'medicine':
+        return `药 ${todayStats?.medicine || 0} 次`
+      case 'temperature':
+        return `体温 ${todayStats?.temperature || 0} 次`
+      case 'growth':
+        return `成长 ${todayStats?.growth || 0} 次`
+      case 'outdoor':
+        return `户外 ${todayStats?.outdoor || 0} 次`
+      case 'cry':
+        return `哭闹 ${todayStats?.cry || 0} 次`
+      case 'gear':
+        return `护具 ${todayStats?.gearHours || 0} 小时`
+      default:
+        return ''
+    }
+  }
+
   // 前端筛选：根据类型过滤记录
-  const filteredRecords = categoryFilter
-    ? allRecords.filter((r) => r.category === categoryFilter)
-    : allRecords
+  const filteredRecords = allRecords.filter((record) => {
+    if (categoryFilter && record.category !== categoryFilter) {
+      return false
+    }
+
+    if (categoryFilter === 'other' && otherSubFilter && record.subCategory !== otherSubFilter) {
+      return false
+    }
+
+    return true
+  })
 
   const groups = groupByDate(filteredRecords)
 
@@ -418,13 +483,35 @@ export default function RecordsPage() {
                 <View
                   key={cat.value}
                   className={`filter-chip ${categoryFilter === cat.value ? 'active' : ''}`}
-                  onClick={() => setCategoryFilter(cat.value)}
+                  onClick={() => {
+                    setCategoryFilter(cat.value)
+                    if (cat.value !== 'other') {
+                      setOtherSubFilter('')
+                    }
+                  }}
                 >
                   <Text>{cat.label}</Text>
                 </View>
               ))}
             </View>
           </View>
+
+          {categoryFilter === 'other' && (
+            <View className='other-subfilters'>
+              <Text className='subfilter-label'>细分</Text>
+              <View className='subcategory-filters'>
+                {OTHER_SUBCATEGORY_FILTERS.map((item) => (
+                  <View
+                    key={item.value}
+                    className={`subfilter-chip ${otherSubFilter === item.value ? 'active' : ''}`}
+                    onClick={() => setOtherSubFilter(item.value)}
+                  >
+                    <Text>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
           <View className='stats-row'>
             <View className='stats-header'>
@@ -536,25 +623,63 @@ export default function RecordsPage() {
 
                   {/* 其他类别 */}
                   {categoryFilter === 'other' &&
+                    otherSubFilter !== '' &&
+                    filteredRecords.length > 0 && (
+                      <View className='stat-line'>
+                        <Text className='stat-value-text'>
+                          {getOtherFilterStatText(otherSubFilter)}
+                        </Text>
+                      </View>
+                    )}
+
+                  {categoryFilter === 'other' &&
+                    otherSubFilter === '' &&
                     (todayStats.outdoor > 0 ||
                       todayStats.tonic > 0 ||
                       todayStats.cry > 0 ||
-                      todayStats.gearHours > 0) && (
+                      todayStats.gearHours > 0 ||
+                      todayStats.growth > 0 ||
+                      todayStats.medicine > 0 ||
+                      todayStats.temperature > 0) && (
                       <View className='stat-line'>
                         <Text className='stat-value-text'>
                           {todayStats.outdoor > 0 && `户外 ${todayStats.outdoor} 次`}
                           {todayStats.outdoor > 0 &&
                             (todayStats.tonic > 0 ||
                               todayStats.cry > 0 ||
-                              todayStats.gearHours > 0) &&
+                              todayStats.gearHours > 0 ||
+                              todayStats.growth > 0 ||
+                              todayStats.medicine > 0 ||
+                              todayStats.temperature > 0) &&
                             '，'}
                           {todayStats.tonic > 0 && `补剂 ${todayStats.tonic} 次`}
                           {todayStats.tonic > 0 &&
-                            (todayStats.cry > 0 || todayStats.gearHours > 0) &&
+                            (todayStats.cry > 0 ||
+                              todayStats.gearHours > 0 ||
+                              todayStats.growth > 0 ||
+                              todayStats.medicine > 0 ||
+                              todayStats.temperature > 0) &&
                             '，'}
                           {todayStats.cry > 0 && `哭闹 ${todayStats.cry} 次`}
-                          {todayStats.cry > 0 && todayStats.gearHours > 0 && '，'}
+                          {todayStats.cry > 0 &&
+                            (todayStats.gearHours > 0 ||
+                              todayStats.growth > 0 ||
+                              todayStats.medicine > 0 ||
+                              todayStats.temperature > 0) &&
+                            '，'}
                           {todayStats.gearHours > 0 && `护具 ${todayStats.gearHours} 小时`}
+                          {todayStats.gearHours > 0 &&
+                            (todayStats.growth > 0 ||
+                              todayStats.medicine > 0 ||
+                              todayStats.temperature > 0) &&
+                            '，'}
+                          {todayStats.growth > 0 && `成长 ${todayStats.growth} 次`}
+                          {todayStats.growth > 0 &&
+                            (todayStats.medicine > 0 || todayStats.temperature > 0) &&
+                            '，'}
+                          {todayStats.medicine > 0 && `药 ${todayStats.medicine} 次`}
+                          {todayStats.medicine > 0 && todayStats.temperature > 0 && '，'}
+                          {todayStats.temperature > 0 && `体温 ${todayStats.temperature} 次`}
                         </Text>
                       </View>
                     )}
@@ -565,12 +690,19 @@ export default function RecordsPage() {
                       todayStats.milk === 0 &&
                       todayStats.food === 0) ||
                       (categoryFilter === 'sleep' && todayStats.sleep === 0) ||
-                      (categoryFilter === 'shit' && todayStats.diaper === 0 && todayStats.poop === 0) ||
+                      (categoryFilter === 'shit' &&
+                        todayStats.diaper === 0 &&
+                        todayStats.poop === 0) ||
                       (categoryFilter === 'other' &&
-                        todayStats.outdoor === 0 &&
-                        todayStats.tonic === 0 &&
-                        todayStats.cry === 0 &&
-                        todayStats.gearHours === 0)) && (
+                        (otherSubFilter
+                          ? filteredRecords.length === 0
+                          : todayStats.outdoor === 0 &&
+                            todayStats.tonic === 0 &&
+                            todayStats.cry === 0 &&
+                            todayStats.gearHours === 0 &&
+                            todayStats.growth === 0 &&
+                            todayStats.medicine === 0 &&
+                            todayStats.temperature === 0))) && (
                       <Text className='stat-empty-inline'>暂无数据</Text>
                     )}
                 </>
@@ -620,6 +752,11 @@ export default function RecordsPage() {
                           </View>
                         </View>
                       </View>
+                      {getFoodTypeDetail(record) && (
+                        <View className='record-detail-row'>
+                          <Text className='record-detail'>{getFoodTypeDetail(record)}</Text>
+                        </View>
+                      )}
                       <View className='record-sub-row'>
                         <Text className='record-time'>{formatTimestamp(record.startTime)}</Text>
                         <Text className='record-reporter'>
