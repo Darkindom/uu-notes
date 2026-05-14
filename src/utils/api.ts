@@ -11,14 +11,13 @@ import {
 import { recordStore } from '../store/recordStore'
 
 // 环境配置
-const ENV = process.env.TARO_APP_ENV || 'prod' // 默认使用生产环境
+const ENV = process.env.TARO_APP_ENV || 'dev' // 默认使用开发环境
 
 // API 配置 - 根据环境选择不同的 API 地址
 const API_CONFIG = {
-  dev: 'https://dksiuu.top/api', // 开发环境
-  // dev: 'https://dksiuu.top/api', // 开发环境（远程服务器）
-  test: 'https://dksiuu.top/api', // 测试环境
-  prod: 'https://dksiuu.top/api', // 生产环境（正式发布使用）
+  dev: 'http://localhost:1717/api', // 本地开发
+  test: 'https://dksiuu.top/api', // 测试环境（NAS）
+  prod: 'https://dksiuu.top/api', // 生产环境（NAS）
 }
 
 const API_BASE = API_CONFIG[ENV]

@@ -1171,11 +1171,20 @@ function callDeepSeekAPI(text) {
 food: breast_milk(母乳) / milk(奶粉) / babycook(辅食) / water(水)
 sleep: subCategory 固定为 sleep
 shit: big(大便) / small(换尿布/小便)
+other: tonic(补剂) / medicine(药) / temperature(体温) / growth(成长/身高/体重) / outdoor(户外) / cry(哭闹) / gear(护具/支架)
 
 ## value 规则
 - food 类型：提取奶量/食量的数字，单位默认为 ml
 - **sleep 类型：必须转换为分钟**，如"睡了5小时" → value="300"，"睡了30分钟" → value="30"
 - shit 类型：通常不填 value
+- other 类型：
+  - tonic(补剂): value 填 "1"
+  - medicine(药): value 填药名, 如没提及药名则填 "1"
+  - temperature(体温): value 填温度数字, 如 "38.5"
+  - growth(成长): value 填身高/体重数字
+  - outdoor(户外): value 填时长(分钟)
+  - cry(哭闹): value 填时长(分钟)
+  - gear(护具): value 填 "1"
 
 ## 输出格式
 只返回 JSON 数组，不要额外解释：
@@ -1246,6 +1255,23 @@ const SUBCATEGORY_ALIASES = {
   // shit
   big: 'big',
   small: 'small',
+  // other
+  tonic: 'tonic',
+  medicine: 'medicine',
+  temperature: 'temperature',
+  growth: 'growth',
+  outdoor: 'outdoor',
+  cry: 'cry',
+  gear: 'gear',
+  // 中文别名
+  '补剂': 'tonic',
+  '药': 'medicine',
+  '体温': 'temperature',
+  '成长': 'growth',
+  '户外': 'outdoor',
+  '哭闹': 'cry',
+  '护具': 'gear',
+  '支架': 'gear',
 }
 
 // 校验并清理 LLM 返回的单条记录
@@ -1332,7 +1358,7 @@ app.post('/api/voice/analyze', verifyToken, async (req, res) => {
     const items = Array.isArray(parsed) ? parsed : [parsed]
 
     // 校验每条记录
-    const validated = items.map(validateRecordItem).filter(item => item.note || item.category !== 'other')
+    const validated = items.map(validateRecordItem).filter(item => item.note || item.subCategory || item.category !== 'other')
 
     // 过滤后为空，说明内容与宝宝无关，拒绝处理
     if (validated.length === 0) {

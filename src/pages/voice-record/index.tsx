@@ -17,6 +17,10 @@ const SUB_LABELS: Record<string, Record<string, string>> = {
   food: { breast_milk: '母乳', milk: '奶粉', babycook: '辅食', water: '水' },
   shit: { big: '大便', small: '换尿布' },
   sleep: { sleep: '睡眠' },
+  other: {
+    tonic: '补剂', medicine: '药', temperature: '体温',
+    growth: '成长', outdoor: '户外', cry: '哭闹', gear: '护具',
+  },
 }
 
 function subLabel(item: VoiceAnalysisResult) {
@@ -24,13 +28,17 @@ function subLabel(item: VoiceAnalysisResult) {
 }
 
 function valueWithUnit(item: VoiceAnalysisResult) {
-  if (!item.value) return ''
+  if (!item.value || item.value === '1') return ''
   if (item.category === 'sleep') {
     const v = parseInt(item.value)
     if (v >= 60) return `${Math.floor(v / 60)}小时${v % 60 > 0 ? v % 60 + '分钟' : ''}`
     return `${v}分钟`
   }
   if (item.category === 'food') return `${item.value}ml`
+  if (item.category === 'other') {
+    if (item.subCategory === 'temperature') return `${item.value}℃`
+    if (item.subCategory === 'outdoor' || item.subCategory === 'cry') return `${item.value}分钟`
+  }
   return item.value
 }
 
@@ -161,23 +169,27 @@ export default function VoiceRecordPage() {
       <View className='recording-section'>
         {/* 文本框 */}
         <View className='text-section'>
-          <Textarea
-            className='text-input'
-            placeholder='录音后文字会出现在这里，也可以直接输入…'
-            value={editedText}
-            onInput={(e) => { setEditedText(e.detail.value); setResults(null) }}
-            maxlength={500}
-            autoHeight
-            disabled={isSubmitting}
-          />
+          <View className='text-input-wrapper'>
+            <Textarea
+              className='text-input'
+              placeholder='录音后文字会出现在这里，也可以直接输入…'
+              value={editedText}
+              onInput={(e) => { setEditedText(e.detail.value); setResults(null) }}
+              maxlength={500}
+              autoHeight
+              disabled={isSubmitting}
+            />
+            {editedText.trim() && (
+              <View className='clear-btn' onClick={clearText}>
+                <Text>✕</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* 分析按钮 / 确认列表 */}
         {!results ? (
           <View className='action-buttons'>
-            {editedText.trim() && (
-              <Button className='btn btn-secondary' onClick={clearText}>清空</Button>
-            )}
             <Button className='btn btn-primary' onClick={handleAnalyze} loading={isSubmitting} disabled={isSubmitting}>
               提交分析
             </Button>

@@ -1,5 +1,5 @@
 import { PropsWithChildren } from 'react'
-import Taro, { useLaunch } from '@tarojs/taro'
+import Taro, { useLaunch, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 
 import './app.less'
 
@@ -9,7 +9,15 @@ function App({ children }: PropsWithChildren<any>) {
     console.log('自建后端 API: https://dksiuu.top/api')
   })
 
-  // children 是将要会渲染的页面
+  useShareAppMessage(() => ({
+    title: 'UU日记 - 记录宝宝日常',
+    path: '/pages/index/index',
+  }))
+
+  useShareTimeline(() => ({
+    title: 'UU日记 - 宝宝成长记录好帮手',
+  }))
+
   return children
 }
 

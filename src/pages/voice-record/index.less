@@ -31,10 +31,43 @@
     .text-section {
       margin-bottom: 32px;
 
+      .text-input-wrapper {
+        position: relative;
+
+        .clear-btn {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: #DDD;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10;
+
+          Text {
+            font-size: 28px;
+            color: #666;
+            font-weight: bold;
+          }
+
+          &:active {
+            background: #FF6B35;
+
+            Text {
+              color: white;
+            }
+          }
+        }
+      }
+
       .text-input {
         width: 100%;
         min-height: 320px;
         padding: 28px;
+        padding-right: 56px;
         background: #FAFAFA;
         border-radius: 20px;
         border: 2px solid #E8E8E8;
