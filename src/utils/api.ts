@@ -521,6 +521,7 @@ export interface VoiceAnalysisResult {
   category: string
   subCategory?: string
   value?: string
+  extra?: any
   note?: string
 }
 

@@ -1162,21 +1162,24 @@ function callDeepSeekAPI(text) {
 如果用户输入的内容与宝宝日常记录完全无关（比如聊天气、问编程问题、讲笑话等），请返回空数组：[]。不要对无关内容强行分类。
 
 ## 分类规则
-- food: 吃/喂养（关键词：喝、吃、奶、母乳、奶粉、辅食、喂）
+- food: 吃/喂养（关键词：喝、吃、奶、母乳、奶粉、辅食、水果、零食、喂）
 - sleep: 睡觉（关键词：睡、觉、入睡、睡着）
 - shit: 拉/换尿布（关键词：拉、大便、尿、换尿布、尿片、尿不湿）
 - other: 其他与宝宝相关但不属于以上类别的内容
 
 ## 子类别（必须使用以下精确值）
-food: breast_milk(母乳) / milk(奶粉) / babycook(辅食) / water(水)
+food: breast_milk(母乳) / milk(奶粉) / babycook(辅食) / fruit(水果) / snack(零食) / water(水)
 sleep: subCategory 固定为 sleep
 shit: big(大便) / small(换尿布/小便)
 other: tonic(补剂) / medicine(药) / temperature(体温) / growth(成长/身高/体重) / outdoor(户外) / cry(哭闹) / gear(护具/支架)
 
 ## value 规则
-- food 类型：提取奶量/食量的数字，单位默认为 ml
+- food 类型：
+  - breast_milk/milk：value 填奶量数字，单位默认 ml
+  - water/babycook：value 填 0/1/2，分别表示少/中/多
+  - fruit/snack：value 填用户描述的量，如"半个"、"一小袋"，没说量就不填
 - **sleep 类型：必须转换为分钟**，如"睡了5小时" → value="300"，"睡了30分钟" → value="30"
-- shit 类型：通常不填 value
+- shit 类型：大便量填 0/1/2，分别表示少/中/多；没说量就不填
 - other 类型：
   - tonic(补剂): value 填 "1"
   - medicine(药): value 填药名, 如没提及药名则填 "1"
@@ -1187,11 +1190,18 @@ other: tonic(补剂) / medicine(药) / temperature(体温) / growth(成长/身�
   - gear(护具): value 填 "1"
 
 ## 输出格式
+## extra 规则
+- food 的 babycook/fruit/snack 必须把具体吃了什么放到 extra.food_type，如 extra: {"food_type":"番薯粥、肉骨汤"}
+- shit 的 big 如提到颜色/软硬，必须放到 extra.color / extra.hardness
+- color 只能使用 yellow/brown/black/green/red
+- hardness 只能使用 loose/soft/hard
+
 只返回 JSON 数组，不要额外解释：
 [
   { "category": "food", "subCategory": "milk", "value": "150", "note": "喝了150毫升奶" },
   { "category": "sleep", "subCategory": "sleep", "value": "300", "note": "睡了5小时" },
-  { "category": "shit", "subCategory": "small", "note": "换了尿布" }
+  { "category": "shit", "subCategory": "big", "value": "2", "extra": { "color": "black" }, "note": "大便量多黑色" },
+  { "category": "food", "subCategory": "babycook", "extra": { "food_type": "番薯粥、肉骨汤" }, "note": "辅食吃了番薯粥、肉骨汤" }
 ]`,
         },
         { role: 'user', content: text },
@@ -1249,6 +1259,8 @@ const SUBCATEGORY_ALIASES = {
   milk: 'milk',
   solid: 'babycook',
   babycook: 'babycook',
+  fruit: 'fruit',
+  snack: 'snack',
   water: 'water',
   // sleep
   sleep: 'sleep',
@@ -1266,12 +1278,97 @@ const SUBCATEGORY_ALIASES = {
   // 中文别名
   '补剂': 'tonic',
   '药': 'medicine',
+  '辅食': 'babycook',
+  '水果': 'fruit',
+  '零食': 'snack',
   '体温': 'temperature',
   '成长': 'growth',
   '户外': 'outdoor',
   '哭闹': 'cry',
   '护具': 'gear',
   '支架': 'gear',
+}
+
+const AMOUNT_VALUE_ALIASES = {
+  '少': '0',
+  '较少': '0',
+  '一点': '0',
+  '一点点': '0',
+  '中': '1',
+  '适中': '1',
+  '正常': '1',
+  '多': '2',
+  '较多': '2',
+  '很多': '2',
+  '量多': '2',
+}
+
+const COLOR_ALIASES = {
+  yellow: 'yellow',
+  '黄': 'yellow',
+  '黄色': 'yellow',
+  brown: 'brown',
+  '棕': 'brown',
+  '棕色': 'brown',
+  black: 'black',
+  '黑': 'black',
+  '黑色': 'black',
+  green: 'green',
+  '绿': 'green',
+  '绿色': 'green',
+  red: 'red',
+  '红': 'red',
+  '红色': 'red',
+}
+
+const HARDNESS_ALIASES = {
+  loose: 'loose',
+  '稀': 'loose',
+  '水样': 'loose',
+  soft: 'soft',
+  '软': 'soft',
+  hard: 'hard',
+  '硬': 'hard',
+}
+
+function normalizeAmountValue(value) {
+  if (value == null) return ''
+  const raw = String(value).trim()
+  if (!raw) return ''
+  if (/^\d+/.test(raw)) return String(parseInt(raw.match(/^\d+/)[0]))
+  return AMOUNT_VALUE_ALIASES[raw] || ''
+}
+
+function normalizeExtra(category, subCategory, item) {
+  const inputExtra = item.extra && typeof item.extra === 'object' ? item.extra : {}
+  const extra = {}
+
+  if (category === 'food' && ['babycook', 'fruit', 'snack'].includes(subCategory)) {
+    const foodType = inputExtra.food_type || inputExtra.foodType || item.food_type || item.foodType
+    if (foodType) {
+      extra.food_type = String(foodType).trim()
+    }
+  }
+
+  if (category === 'shit' && subCategory === 'big') {
+    const note = item.note || ''
+    const color = inputExtra.color || item.color
+    const hardness = inputExtra.hardness || item.hardness
+
+    const normalizedColor = COLOR_ALIASES[color] ||
+      Object.keys(COLOR_ALIASES).find((key) => note.includes(key))
+    const normalizedHardness = HARDNESS_ALIASES[hardness] ||
+      Object.keys(HARDNESS_ALIASES).find((key) => note.includes(key))
+
+    if (normalizedColor) {
+      extra.color = COLOR_ALIASES[normalizedColor] || normalizedColor
+    }
+    if (normalizedHardness) {
+      extra.hardness = HARDNESS_ALIASES[normalizedHardness] || normalizedHardness
+    }
+  }
+
+  return Object.keys(extra).length > 0 ? extra : null
 }
 
 // 校验并清理 LLM 返回的单条记录
@@ -1293,19 +1390,38 @@ function validateRecordItem(item) {
     result.subCategory = 'sleep'
   }
 
-  // value 处理：提取数字并做单位转换
-  if (item.value && /^\d+/.test(String(item.value))) {
-    let v = parseInt(String(item.value).match(/^\d+/)[0])
+  // value 处理：提取数字/少中多并做单位转换
+  if (item.value) {
+    let v
+
+    if (category === 'food' && (result.subCategory === 'fruit' || result.subCategory === 'snack')) {
+      v = String(item.value).trim()
+    } else {
+      v = normalizeAmountValue(item.value)
+    }
 
     // 睡眠单位转换：如果文字里提到"小时/h/小时(s)"且数值 < 24，转换为分钟
-    if (category === 'sleep' && v > 0) {
+    if (category === 'sleep' && v) {
+      v = parseInt(v)
       const text = (item.note || '').toLowerCase()
       if (/小时|个小时|个钟|hour|h\b/.test(text) && v < 24) {
         v = v * 60
       }
     }
 
-    result.value = String(v)
+    if (v !== '' && v != null) {
+      result.value = String(v)
+    }
+  } else if (category === 'shit' && result.subCategory === 'big') {
+    const amountFromNote = Object.keys(AMOUNT_VALUE_ALIASES).find((key) => (item.note || '').includes(key))
+    if (amountFromNote) {
+      result.value = AMOUNT_VALUE_ALIASES[amountFromNote]
+    }
+  }
+
+  const extra = normalizeExtra(category, result.subCategory, item)
+  if (extra) {
+    result.extra = extra
   }
 
   result.note = item.note || ''

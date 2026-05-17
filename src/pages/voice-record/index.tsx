@@ -2,6 +2,7 @@ import { View, Text, Button, Textarea } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import { getCurrentBaby, createRecord, analyzeVoiceText, type VoiceAnalysisResult } from '../../utils/api'
+import { buildVoiceRecordPayload, formatVoiceAnalysisReview } from '../../utils/voiceAnalysis'
 import './index.less'
 
 declare const requirePlugin: any
@@ -12,35 +13,6 @@ const CATEGORY_MAP = {
   shit: { label: '拉', emoji: '🚽', color: '#8B6E5B' },
   other: { label: '其他', emoji: '✨', color: '#4CAF7D' },
 } as const
-
-const SUB_LABELS: Record<string, Record<string, string>> = {
-  food: { breast_milk: '母乳', milk: '奶粉', babycook: '辅食', water: '水' },
-  shit: { big: '大便', small: '换尿布' },
-  sleep: { sleep: '睡眠' },
-  other: {
-    tonic: '补剂', medicine: '药', temperature: '体温',
-    growth: '成长', outdoor: '户外', cry: '哭闹', gear: '护具',
-  },
-}
-
-function subLabel(item: VoiceAnalysisResult) {
-  return item.subCategory ? SUB_LABELS[item.category]?.[item.subCategory] || '' : ''
-}
-
-function valueWithUnit(item: VoiceAnalysisResult) {
-  if (!item.value || item.value === '1') return ''
-  if (item.category === 'sleep') {
-    const v = parseInt(item.value)
-    if (v >= 60) return `${Math.floor(v / 60)}小时${v % 60 > 0 ? v % 60 + '分钟' : ''}`
-    return `${v}分钟`
-  }
-  if (item.category === 'food') return `${item.value}ml`
-  if (item.category === 'other') {
-    if (item.subCategory === 'temperature') return `${item.value}℃`
-    if (item.subCategory === 'outdoor' || item.subCategory === 'cry') return `${item.value}分钟`
-  }
-  return item.value
-}
 
 export default function VoiceRecordPage() {
   const [isRecording, setIsRecording] = useState(false)
@@ -136,14 +108,7 @@ export default function VoiceRecordPage() {
     let created = 0
     for (const item of results) {
       try {
-        await createRecord({
-          babyId,
-          category: item.category,
-          subCategory: item.subCategory,
-          startTime: Date.now(),
-          value: item.value,
-          note: item.note || editedText,
-        })
+        await createRecord(buildVoiceRecordPayload(babyId, item, editedText))
         created++
       } catch (err) { console.error('创建失败:', item, err) }
     }
@@ -199,14 +164,12 @@ export default function VoiceRecordPage() {
             <Text className='review-title'>识别结果，确认后提交</Text>
             {results.map((item, i) => {
               const cat = CATEGORY_MAP[item.category] || CATEGORY_MAP.other
-              const sub = subLabel(item)
-              const unit = valueWithUnit(item)
               return (
                 <View key={i} className='review-item'>
                   <View className='review-left'>
                     <Text className='review-emoji'>{cat.emoji}</Text>
                     <View className='review-info'>
-                      <Text className='review-category'>{cat.label}{sub ? ` · ${sub}` : ''}{unit ? ` · ${unit}` : ''}</Text>
+                      <Text className='review-category'>{formatVoiceAnalysisReview(item)}</Text>
                       {item.note && <Text className='review-note'>{item.note}</Text>}
                     </View>
                   </View>

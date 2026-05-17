@@ -71,7 +71,14 @@ export function formatRecordSummary(record: Record): string {
     return `喝水 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
   }
   if (sub === 'babycook') {
-    return `辅食 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
+    const amount = AMOUNT_LABELS[parseInt(val)] ?? val
+    if (amount) {
+      return `辅食 ${amount}`
+    }
+    if (extra.food_type) {
+      return `辅食 ${extra.food_type}`
+    }
+    return '辅食'
   }
   if (sub === 'fruit' || sub === 'snack') {
     const name = extra.food_type ?? ''
@@ -88,10 +95,12 @@ export function formatRecordSummary(record: Record): string {
     const color = SHIT_COLORS.find((c) => c.value === extra.color)?.label ?? ''
     const hardness = SHIT_HARDNESS.find((h) => h.value === extra.hardness)?.label ?? ''
     const amount = AMOUNT_LABELS[parseInt(val)] ? `量${AMOUNT_LABELS[parseInt(val)]}` : val
-    return `${amount} ${color} ${hardness}`.trim()
+    const summary = `${amount} ${color} ${hardness}`.trim()
+    return summary || record.note || SUBCATEGORY_LABELS[sub]
   }
   if (sub === 'small') {
-    return `换尿片 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
+    const amount = AMOUNT_LABELS[parseInt(val)] ?? val
+    return amount ? `换尿片 ${amount}` : record.note || '换尿片'
   }
   if (sub === 'tonic') {
     return `补剂 ${extra.tonic_type ?? ''}`
@@ -153,7 +162,7 @@ export function getFoodTypeDetail(record: Record): string {
   const sub = record.subCategory || ''
   const extra = (record.extra as any) || {}
   
-  if (sub === 'babycook' && extra.food_type) {
+  if (sub === 'babycook' && extra.food_type && record.value) {
     return extra.food_type
   }
   return ''

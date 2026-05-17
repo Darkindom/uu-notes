@@ -59,6 +59,29 @@ test('keeps babycook scale summary and food detail behavior', () => {
   assert.equal(getFoodTypeDetail(record), '番薯粥')
 })
 
+test('formats voice-created babycook and fallback shit records without empty summaries', () => {
+  const { formatRecordSummary, getFoodTypeDetail } = loadFormatModule()
+  const babycook = {
+    category: 'food',
+    subCategory: 'babycook',
+    value: '',
+    extra: { food_type: '番薯粥、肉骨汤' },
+  }
+
+  assert.equal(formatRecordSummary(babycook), '辅食 番薯粥、肉骨汤')
+  assert.equal(getFoodTypeDetail(babycook), '')
+  assert.equal(
+    formatRecordSummary({
+      category: 'shit',
+      subCategory: 'big',
+      value: '',
+      extra: {},
+      note: '大便颜色偏深',
+    }),
+    '大便颜色偏深',
+  )
+})
+
 test('identifies solid food subcategories used by food stats', () => {
   const { isSolidFoodSubCategory } = loadFormatModule()
 
