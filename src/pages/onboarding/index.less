@@ -7,7 +7,7 @@
 
   .tutorial-card {
     min-height: 100vh;
-    padding: 56px 32px 36px;
+    padding: 40px 32px 32px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -16,20 +16,20 @@
 
   .tutorial-header {
     text-align: center;
-    padding-bottom: 40px;
+    padding-bottom: 22px;
   }
 
   .tutorial-title {
     display: block;
-    font-size: 56px;
+    font-size: 48px;
     font-weight: 900;
     color: #1a1a2e;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
   }
 
   .tutorial-subtitle {
     display: block;
-    font-size: 32px;
+    font-size: 28px;
     color: #666;
   }
 
@@ -41,36 +41,22 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 24px 12px;
-  }
-
-  .tutorial-marker {
-    width: 128px;
-    height: 128px;
-    border-radius: 50%;
-    background: #ff6b35;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 64px;
-    font-weight: 900;
-    margin-bottom: 32px;
+    padding: 10px 12px 18px;
   }
 
   .tutorial-step-title {
     display: block;
-    font-size: 52px;
+    font-size: 44px;
     font-weight: 900;
     color: #1a1a2e;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
   }
 
   .tutorial-step-desc {
     display: block;
     max-width: 620px;
-    font-size: 34px;
-    line-height: 1.6;
+    font-size: 30px;
+    line-height: 1.45;
     color: #555;
   }
 
@@ -121,5 +107,238 @@
   .tutorial-next-btn {
     background: #ff6b35;
     color: #fff;
+  }
+
+  .tutorial-visual {
+    width: 560px;
+    height: 340px;
+    border: 4px solid #1a1a2e;
+    border-radius: 28px;
+    background: #fff;
+    box-shadow: 0 12px 0 rgba(26, 26, 46, 0.08);
+    margin-bottom: 28px;
+    padding: 28px;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .visual-phone-header {
+    height: 18px;
+    width: 148px;
+    border-radius: 18px;
+    background: #e8e0d8;
+    margin: 0 auto 24px;
+  }
+
+  .baby-avatar-preview {
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    background: #eef4ff;
+    color: #5b8def;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 44px;
+    font-weight: 900;
+  }
+
+  .visual-input {
+    height: 34px;
+    width: 68%;
+    border-radius: 18px;
+    background: #f1ece7;
+    margin: 0 auto 16px;
+
+    &.wide {
+      width: 82%;
+    }
+  }
+
+  .visual-primary-btn {
+    width: 220px;
+    height: 44px;
+    border-radius: 24px;
+    background: #ff6b35;
+    margin: 16px auto 0;
+  }
+
+  .record-milk-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .milk-bottle {
+    width: 112px;
+    height: 140px;
+    border: 6px solid #ff9500;
+    border-radius: 26px 26px 34px 34px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 14px;
+    background: #fffaf3;
+  }
+
+  .milk-cap {
+    width: 54px;
+    height: 24px;
+    border-radius: 12px 12px 4px 4px;
+    background: #ff9500;
+    position: absolute;
+    left: 23px;
+    top: 8px;
+  }
+
+  .milk-level {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 58%;
+    background: #ffe0a8;
+  }
+
+  .amount-preview {
+    font-size: 42px;
+    font-weight: 900;
+    color: #1a1a2e;
+    margin-bottom: 18px;
+  }
+
+  .visual-chip-row {
+    display: flex;
+    gap: 14px;
+  }
+
+  .visual-chip {
+    width: 96px;
+    height: 38px;
+    border-radius: 22px;
+    background: #f1ece7;
+
+    &.active {
+      background: #ff9500;
+    }
+  }
+
+  .record-row {
+    height: 68px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    border-bottom: 2px solid #f1ece7;
+  }
+
+  .record-dot {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+
+    &.food {
+      background: #ff9500;
+    }
+
+    &.sleep {
+      background: #5b8def;
+    }
+
+    &.poop {
+      background: #8b6e5b;
+    }
+  }
+
+  .record-lines {
+    flex: 1;
+  }
+
+  .record-line {
+    height: 18px;
+    border-radius: 12px;
+    background: #e8e0d8;
+    margin-bottom: 10px;
+
+    &.long {
+      width: 90%;
+    }
+
+    &.medium {
+      width: 72%;
+    }
+
+    &.short {
+      width: 42%;
+      background: #f1ece7;
+      margin-bottom: 0;
+    }
+  }
+
+  .food-week-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .food-pill {
+    flex: 1;
+    height: 44px;
+    border-radius: 22px;
+    background: #f1ece7;
+
+    &.filled {
+      background: #34c759;
+    }
+  }
+
+  .chart-preview {
+    height: 150px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 22px;
+    border-left: 4px solid #e8e0d8;
+    border-bottom: 4px solid #e8e0d8;
+    margin-bottom: 24px;
+  }
+
+  .chart-bar {
+    width: 44px;
+    border-radius: 18px 18px 0 0;
+    background: #ff9500;
+
+    &.small {
+      height: 54px;
+    }
+
+    &.medium {
+      height: 92px;
+      background: #5b8def;
+    }
+
+    &.tall {
+      height: 126px;
+    }
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+  }
+
+  .legend-item {
+    width: 92px;
+    height: 20px;
+    border-radius: 12px;
+
+    &.orange {
+      background: #ff9500;
+    }
+
+    &.blue {
+      background: #5b8def;
+    }
   }
 }

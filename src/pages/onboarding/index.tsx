@@ -6,30 +6,8 @@ import {
   hasSeenOnboardingTutorial,
   markOnboardingTutorialSeen,
 } from '../../utils/onboardingTutorial'
+import { TUTORIAL_STEPS, type TutorialVisual } from '../../utils/tutorialSteps'
 import './index.less'
-
-const TUTORIAL_STEPS = [
-  {
-    title: '添加宝宝',
-    desc: '先建立宝宝档案，记录会自动归到当前宝宝。',
-    marker: '1',
-  },
-  {
-    title: '记录奶量',
-    desc: '在首页点“吃”，记录母乳、奶粉、水和辅食。',
-    marker: '2',
-  },
-  {
-    title: '查看记录列表',
-    desc: '在“记录”页按日期查看、编辑和删除日常记录。',
-    marker: '3',
-  },
-  {
-    title: '宝宝页看趋势',
-    desc: '宝宝页展示一周辅食、奶量和睡眠图表。',
-    marker: '4',
-  },
-]
 
 export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
@@ -120,6 +98,94 @@ export default function OnboardingPage() {
     setShowTutorial(false)
   }
 
+  function renderTutorialVisual(visual: TutorialVisual) {
+    if (visual === 'add-baby') {
+      return (
+        <View className='tutorial-visual add-baby-visual'>
+          <View className='visual-phone-header' />
+          <View className='baby-avatar-preview'>
+            <Text>宝</Text>
+          </View>
+          <View className='visual-input wide' />
+          <View className='visual-input' />
+          <View className='visual-primary-btn' />
+        </View>
+      )
+    }
+
+    if (visual === 'record-milk') {
+      return (
+        <View className='tutorial-visual record-milk-visual'>
+          <View className='visual-phone-header' />
+          <View className='milk-bottle'>
+            <View className='milk-cap' />
+            <View className='milk-level' />
+          </View>
+          <View className='amount-preview'>
+            <Text>150ml</Text>
+          </View>
+          <View className='visual-chip-row'>
+            <View className='visual-chip active' />
+            <View className='visual-chip' />
+            <View className='visual-chip' />
+          </View>
+        </View>
+      )
+    }
+
+    if (visual === 'records-list') {
+      return (
+        <View className='tutorial-visual records-list-visual'>
+          <View className='visual-phone-header' />
+          <View className='record-row'>
+            <View className='record-dot food' />
+            <View className='record-lines'>
+              <View className='record-line long' />
+              <View className='record-line short' />
+            </View>
+          </View>
+          <View className='record-row'>
+            <View className='record-dot sleep' />
+            <View className='record-lines'>
+              <View className='record-line medium' />
+              <View className='record-line short' />
+            </View>
+          </View>
+          <View className='record-row'>
+            <View className='record-dot poop' />
+            <View className='record-lines'>
+              <View className='record-line long' />
+              <View className='record-line short' />
+            </View>
+          </View>
+        </View>
+      )
+    }
+
+    return (
+      <View className='tutorial-visual baby-chart-visual'>
+        <View className='visual-phone-header' />
+        <View className='food-week-row'>
+          <View className='food-pill filled' />
+          <View className='food-pill filled' />
+          <View className='food-pill' />
+          <View className='food-pill filled' />
+        </View>
+        <View className='chart-preview'>
+          <View className='chart-bar small' />
+          <View className='chart-bar medium' />
+          <View className='chart-bar tall' />
+          <View className='chart-bar medium' />
+          <View className='chart-bar small' />
+        </View>
+        <View className='chart-legend'>
+          <View className='legend-item orange' />
+          <View className='legend-item blue' />
+        </View>
+      </View>
+    )
+  }
+
   if (showTutorial) {
     const step = TUTORIAL_STEPS[tutorialIndex]
     const isLast = tutorialIndex === TUTORIAL_STEPS.length - 1
@@ -133,9 +199,7 @@ export default function OnboardingPage() {
           </View>
 
           <View className='tutorial-body'>
-            <View className='tutorial-marker'>
-              <Text>{step.marker}</Text>
-            </View>
+            {renderTutorialVisual(step.visual)}
             <Text className='tutorial-step-title'>{step.title}</Text>
             <Text className='tutorial-step-desc'>{step.desc}</Text>
           </View>
