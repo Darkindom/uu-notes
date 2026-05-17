@@ -14,13 +14,15 @@ import {
 import Calendar from '../../components/Calendar'
 import './index.less'
 
-type FoodType = 'breast_milk' | 'milk' | 'water' | 'babycook'
+type FoodType = 'breast_milk' | 'milk' | 'water' | 'babycook' | 'fruit' | 'snack'
 
 const FOOD_TYPES: { label: string; value: FoodType }[] = [
   { label: '母乳', value: 'breast_milk' },
   { label: '奶粉', value: 'milk' },
   { label: '水', value: 'water' },
   { label: '辅食', value: 'babycook' },
+  { label: '水果', value: 'fruit' },
+  { label: '零食', value: 'snack' },
 ]
 
 export default function FoodPage() {
@@ -35,6 +37,7 @@ export default function FoodPage() {
   const [milkAmount, setMilkAmount] = useState('')
   const [amountIdx, setAmountIdx] = useState<number | null>(null)
   const [foodName, setFoodName] = useState('')
+  const [foodAmount, setFoodAmount] = useState('')
   const [recentRecords, setRecentRecords] = useState<ApiRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
@@ -53,12 +56,19 @@ export default function FoodPage() {
           
           if (record.subCategory === 'breast_milk' || record.subCategory === 'milk') {
             setMilkAmount(record.value || '')
+            setFoodAmount('')
+          } else if (record.subCategory === 'fruit' || record.subCategory === 'snack') {
+            setMilkAmount('')
+            setAmountIdx(null)
+            setFoodAmount(record.value || '')
+            setFoodName(record.extra?.food_type || '')
           } else {
             const idx = AMOUNT_VALUES.indexOf(record.value || '')
             setAmountIdx(idx >= 0 ? idx : null)
             if (record.subCategory === 'babycook' && record.extra) {
               setFoodName(record.extra.food_type || '')
             }
+            setFoodAmount('')
           }
         }
       }
@@ -89,6 +99,12 @@ export default function FoodPage() {
       setMilkAmount(r.value || '')
       setAmountIdx(null)
       setFoodName('')
+      setFoodAmount('')
+    } else if (sub === 'fruit' || sub === 'snack') {
+      setMilkAmount('')
+      setAmountIdx(null)
+      setFoodName(r.extra?.food_type ?? '')
+      setFoodAmount(r.value || '')
     } else {
       setMilkAmount('')
       const idx = AMOUNT_VALUES.indexOf(r.value || '')
@@ -103,10 +119,13 @@ export default function FoodPage() {
       } else {
         setFoodName('')
       }
+      setFoodAmount('')
     }
   }
 
   const isMilk = foodType === 'breast_milk' || foodType === 'milk'
+  const isTextAmountFood = foodType === 'fruit' || foodType === 'snack'
+  const currentFoodTypeLabel = FOOD_TYPES.find((item) => item.value === foodType)?.label || ''
 
   async function handleSubmit() {
     if (loading) return // 防止重复提交
@@ -123,6 +142,13 @@ export default function FoodPage() {
     } else if (foodType === 'babycook') {
       value = amountIdx !== null ? AMOUNT_VALUES[amountIdx] : ''
       extra = { food_type: foodName }
+    } else if (isTextAmountFood) {
+      if (!foodName.trim()) {
+        Taro.showToast({ title: `请输入${currentFoodTypeLabel}名称`, icon: 'none' })
+        return
+      }
+      value = foodAmount.trim()
+      extra = { food_type: foodName.trim() }
     } else {
       value = amountIdx !== null ? AMOUNT_VALUES[amountIdx] : ''
     }
@@ -205,7 +231,11 @@ export default function FoodPage() {
                 <View
                   key={ft.value}
                   className={`option-chip ${foodType === ft.value ? 'active' : ''}`}
-                  onClick={() => { setFoodType(ft.value); setAmountIdx(null) }}
+                  onClick={() => {
+                    setFoodType(ft.value)
+                    setAmountIdx(null)
+                    setFoodAmount('')
+                  }}
                 >
                   <Text>{ft.label}</Text>
                 </View>
@@ -213,9 +243,21 @@ export default function FoodPage() {
             </View>
           </View>
 
+          {isTextAmountFood && (
+            <View className='section'>
+              <Text className='field-label'>{currentFoodTypeLabel}名称</Text>
+              <Input
+                className='text-input'
+                placeholder='苹果、磨牙饼干'
+                value={foodName}
+                onInput={e => setFoodName(e.detail.value)}
+              />
+            </View>
+          )}
+
           {/* Amount */}
           <View className='section'>
-            <Text className='field-label'>{isMilk ? '奶量' : '饭量'}</Text>
+            <Text className='field-label'>{isMilk ? '奶量' : isTextAmountFood ? '量（可选）' : '饭量'}</Text>
             {isMilk ? (
               <View className='number-input-row'>
                 <Input
@@ -227,6 +269,13 @@ export default function FoodPage() {
                 />
                 <Text className='unit-text'>毫升</Text>
               </View>
+            ) : isTextAmountFood ? (
+              <Input
+                className='text-input'
+                placeholder='半个、一小袋'
+                value={foodAmount}
+                onInput={e => setFoodAmount(e.detail.value)}
+              />
             ) : (
               <View className='options-row'>
                 {AMOUNT_LABELS.map((label, idx) => (
@@ -242,7 +291,7 @@ export default function FoodPage() {
             )}
           </View>
 
-          {/* Food name — only for babycook */}
+          {/* Food name */}
           {foodType === 'babycook' && (
             <View className='section'>
               <Text className='field-label'>食物名称</Text>

@@ -12,6 +12,7 @@ import {
   type Baby,
 } from '../../utils/api'
 import { clearIndexCache, getCachedRecords } from '../../utils/cache'
+import { isSolidFoodSubCategory } from '../../utils/format'
 import Calendar from '../../components/Calendar'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import WeeklyChart from '../../components/WeeklyChart'
@@ -189,7 +190,7 @@ export default function BabySelectorPage() {
               if (hour >= 0 && hour < 6) {
                 stats.nightMilkCount++
               }
-            } else if (record.subCategory === 'babycook') {
+            } else if (isSolidFoodSubCategory(record.subCategory)) {
               // 辅食次数
               stats.food++
             }
@@ -378,7 +379,7 @@ export default function BabySelectorPage() {
                   if (hour >= 0 && hour < 6) {
                     nightMilk += amount
                   }
-                } else if (record.subCategory === 'babycook') {
+                } else if (isSolidFoodSubCategory(record.subCategory)) {
                   food++
                 }
                 break
@@ -574,7 +575,7 @@ export default function BabySelectorPage() {
           const foods: string[] = []
           
           response.records.forEach((record) => {
-            if (record.category === 'food' && record.subCategory === 'babycook') {
+            if (record.category === 'food' && isSolidFoodSubCategory(record.subCategory)) {
               const foodType = record.extra?.food_type
               if (foodType) {
                 foods.push(foodType)

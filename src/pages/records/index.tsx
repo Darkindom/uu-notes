@@ -7,6 +7,7 @@ import {
   formatTimestamp,
   formatRecordSummary,
   getFoodTypeDetail,
+  isSolidFoodSubCategory,
   CATEGORY_LABELS,
   SUBCATEGORY_LABELS,
 } from '../../utils/format'
@@ -147,7 +148,7 @@ export default function RecordsPage() {
             if (hour >= 0 && hour < 6) {
               stats.nightMilkCount++
             }
-          } else if (record.subCategory === 'babycook') {
+          } else if (isSolidFoodSubCategory(record.subCategory)) {
             stats.food++
           }
           break

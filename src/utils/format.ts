@@ -26,6 +26,8 @@ export const SUBCATEGORY_LABELS: { [key: string]: string } = {
   milk: '奶粉',
   water: '水',
   babycook: '辅食',
+  fruit: '水果',
+  snack: '零食',
   sleep: '睡眠',
   big: '大便',
   small: '换尿片',
@@ -42,6 +44,10 @@ export const CATEGORY_LABELS: { [key: string]: string } = {
   sleep: '睡',
   shit: '拉',
   other: '其他',
+}
+
+export function isSolidFoodSubCategory(subCategory?: string): boolean {
+  return subCategory === 'babycook' || subCategory === 'fruit' || subCategory === 'snack'
 }
 
 export function formatTimestamp(ts: number): string {
@@ -66,6 +72,10 @@ export function formatRecordSummary(record: Record): string {
   }
   if (sub === 'babycook') {
     return `辅食 ${AMOUNT_LABELS[parseInt(val)] ?? val}`
+  }
+  if (sub === 'fruit' || sub === 'snack') {
+    const name = extra.food_type ?? ''
+    return [SUBCATEGORY_LABELS[sub], name, val].filter(Boolean).join(' ')
   }
   if (sub === 'sleep') {
     const mins = parseInt(val)
